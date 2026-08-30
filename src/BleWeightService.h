@@ -45,6 +45,8 @@ private:
     static const uint8_t COMMAND_DISPLAY_READY = 0x11;
     static const uint8_t COMMAND_DISPLAY_RESULT = 0x12;
     static const uint8_t COMMAND_DISPLAY_AWAY = 0x13;
+    static const uint8_t COMMAND_PLAYER_TURN = 0x14;
+    static const uint8_t COMMAND_PLAYER_CLEAR = 0x15;
 
     Scale& scale_;
     TftDisplay& display_;

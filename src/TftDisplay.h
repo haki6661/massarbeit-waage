@@ -31,6 +31,19 @@ enum class RemoteCue {
     ResultPerfect,  // Schluck hat exakt getroffen
 };
 
+// Welches Spiel gerade laeuft - bestimmt, welche Away-Animation gezeigt wird
+// (Ball/Pfeil/Karte/Block, siehe renderAway*() in TftDisplay.cpp) und das
+// kleine Icon im Spieler-Badge. Werte muessen exakt zum <gameId>-Byte im
+// BLE-Protokoll passen, siehe Config.h.
+enum class GameKind : uint8_t {
+    None = 0,
+    Golf = 1,
+    Dart = 2,
+    Blackjack = 3,
+    Tower = 4,
+    Scale = 5,
+};
+
 class TftDisplay {
 public:
     void begin();
@@ -55,25 +68,62 @@ public:
     // ersten normalen Anzeige - siehe main.cpp.
     void playBootAnimation(bool hx711Connected, float batteryVoltage, bool bleStarted);
 
-    // Von BleWeightService bei einem 0x10/0x11/0x12-Kommando aufgerufen.
+    // Von BleWeightService bei einem 0x10/0x11/0x12/0x13-Kommando aufgerufen.
     // Ueberlagert die naechsten update()-Aufrufe, bis entweder explizit
     // RemoteCue::None gesetzt wird oder das interne Timeout ablaeuft
     // (Sicherheitsnetz, falls die App das Zuruecksetzen vergisst/die BLE-
-    // Verbindung mitten im Ritual abbricht).
-    void setRemoteCue(RemoteCue cue);
+    // Verbindung mitten im Ritual abbricht). `game` waehlt bei Away die
+    // passende Animation, sonst ohne Effekt.
+    void setRemoteCue(RemoteCue cue, GameKind game = GameKind::None);
+
+    // Von BleWeightService bei einem 0x14/0x15-Kommando aufgerufen: zeigt
+    // ein kleines Namens-/Farb-Badge (+ Spiel-Icon) oben auf dem normalen
+    // Gewichtsscreen, solange ein Spieler am Zug ist - siehe
+    // renderPlayerBadge() in TftDisplay.cpp. `name` wird auf ca. 10 Zeichen
+    // gekuerzt (mehr passt auf dem 320x170-Display ohnehin nicht lesbar hin).
+    void setActivePlayer(GameKind game, uint16_t color565, const String& name);
+    void clearActivePlayer();
+
+    // Wandelt 8-Bit-RGB (wie von der App per BLE geschickt, siehe
+    // COMMAND_PLAYER_TURN in Config.h) in den RGB565-Wert um, den Arduino_GFX
+    // erwartet - eigene Methode, weil `gfx_` (und damit color565()) privat ist.
+    uint16_t color565FromRgb(uint8_t r, uint8_t g, uint8_t b) const { return gfx_->color565(r, g, b); }
 
 private:
     Arduino_DataBus* bus_ = nullptr;
     Arduino_GFX* gfx_ = nullptr;
 
+    // Café-Kreide-Akzentfarben der Handy-App (src/styles/globals.css im
+    // App-Repo) angenaehert auf RGB565 - einmal in begin() berechnet statt
+    // in jeder Render-Funktion neu (gfx_->color565() ist zwar billig, aber
+    // so gibt es nur eine Quelle der Wahrheit fuers Farbschema).
+    uint16_t emberColor_ = 0;
+    uint16_t zestColor_ = 0;
+    uint16_t creamColor_ = 0;
+    uint16_t coralColor_ = 0;
+
     DisplayMode lastMode_ = DisplayMode::Weight;
     uint32_t lastRenderMs_ = 0;
     bool forceRedraw_ = true;
+    bool lastBleConnected_ = false;
 
     RemoteCue remoteCue_ = RemoteCue::None;
+    GameKind remoteCueGame_ = GameKind::None; // nur fuer RemoteCue::Away relevant
     uint32_t remoteCueSetMs_ = 0;
 
-    void renderWeightScreen(float weight, float rawReading, bool hx711Connected, bool bleConnected);
-    void renderStatusScreen(bool hx711Connected, bool bleConnected, float batteryVoltage);
+    bool hasActivePlayer_ = false;
+    GameKind activeGame_ = GameKind::None;
+    uint16_t activePlayerColor565_ = 0;
+    String activePlayerName_;
+
+    void renderWeightScreen(float weight, bool hx711Connected, bool bleConnected, bool fullRedraw);
+    void renderStatusScreen(float rawReading, bool hx711Connected, bool bleConnected, float batteryVoltage);
     void renderRemoteCueScreen(RemoteCue cue);
+    void renderPlayerBadge(int16_t x, int16_t y);
+    void renderGameIcon(GameKind game, int16_t cx, int16_t cy, int16_t size, uint16_t color);
+
+    void renderAwayGolf();
+    void renderAwayDart();
+    void renderAwayBlackjack();
+    void renderAwayTower();
 };

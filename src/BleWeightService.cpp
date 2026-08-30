@@ -150,9 +150,14 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
             display_.setRemoteCue(RemoteCue::Ready);
             break;
 
-        case COMMAND_DISPLAY_AWAY:
-            display_.setRemoteCue(RemoteCue::Away);
+        case COMMAND_DISPLAY_AWAY: {
+            // <gameId> optional dran - aeltere/vereinfachte Aufrufer ohne
+            // das Byte bekommen die generische (Golf-)Animation, siehe
+            // TftDisplay::renderRemoteCueScreen().
+            GameKind game = value.size() >= 2 ? static_cast<GameKind>(value[1]) : GameKind::None;
+            display_.setRemoteCue(RemoteCue::Away, game);
             break;
+        }
 
         case COMMAND_DISPLAY_RESULT: {
             if (value.size() < 2) {
@@ -166,6 +171,30 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
             display_.setRemoteCue(cue);
             break;
         }
+
+        case COMMAND_PLAYER_TURN: {
+            // Layout: <gameId><r><g><b><nameLen><name...>, siehe Config.h.
+            if (value.size() < 6) {
+                Serial.println("[BLE] PLAYER_TURN-Kommando zu kurz, ignoriert.");
+                break;
+            }
+            GameKind game = static_cast<GameKind>(value[1]);
+            uint16_t color565 = display_.color565FromRgb(
+                static_cast<uint8_t>(value[2]), static_cast<uint8_t>(value[3]), static_cast<uint8_t>(value[4]));
+            uint8_t nameLen = static_cast<uint8_t>(value[5]);
+            String name;
+            size_t available = value.size() - 6;
+            size_t take = nameLen < available ? nameLen : available;
+            for (size_t i = 0; i < take; i++) {
+                name += value[6 + i];
+            }
+            display_.setActivePlayer(game, color565, name);
+            break;
+        }
+
+        case COMMAND_PLAYER_CLEAR:
+            display_.clearActivePlayer();
+            break;
 
         default:
             Serial.printf("[BLE] Unbekanntes Kommando: 0x%02X\n", command);
