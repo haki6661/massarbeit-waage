@@ -45,3 +45,35 @@ draufzuschlagen, plus die Serial-USB-Warteschleife von 3s auf 300ms
 verkürzt. Normaler Boot jetzt unter 2s statt vorher ~4-5s. Die Boot-Checks
 (HX711/Akku/BLE) sind als eigener Text-Screen komplett weg - nur bei
 tatsächlichem HX711-Fehler erscheint danach weiterhin eine Fehlermeldung.
+
+## 3. Neuer Spielmodus: nur Zeit stoppen ("Ex"-Modus, Glas muss leer sein)
+
+**Idee:** Ein einfacher Modus ohne Punkte-/Zielsystem wie bei den
+bestehenden Spielen (Golf/Dart/Blackjack/Tower) - es wird nur die Zeit
+gestoppt, die jemand zum vollständigen Leertrinken ("exen") eines Glases
+braucht. Die Zeit läuft erst ab, bis das Glas wieder auf ~Taragewicht
+zurück ist (komplett leer), nicht schon bei geringerer Restmenge.
+
+**Warum:** Schnelles, unkompliziertes Partyspiel ohne Zielgenauigkeit -
+reine Geschwindigkeitsmessung statt "wie nah am Zielgewicht" wie bei den
+anderen Spielen.
+
+**Später denkbar:** Trink-Statistiken je Spieler - nicht nur die
+Gesamtzeit, sondern z.B. der g/s-Verlauf während des Exens (wie schnell
+zu Beginn vs. gegen Ende), für einen Vergleich/eine Bestenliste "wer
+trinkt am schnellsten".
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Wann startet die Zeitmessung - sobald das Glas von der Waage gehoben
+  wird (analog zum "Away"-Zustand der anderen Spiele), oder über einen
+  eigenen Start-Trigger?
+- Wie wird "leer" erkannt - exakte Rückkehr aufs Taragewicht (0g) beim
+  Wiederabstellen, oder ein Toleranzband (z.B. <5g Rest zählt als leer)?
+- Eigenes `GameKind` (mit Icon/Away-Animation) oder Sonderfall im
+  bestehenden Katalog?
+- Wo/wie wird die g/s-Kurve gespeichert - nur fürs Live-Feedback in der
+  App während des Exens, oder dauerhaft je Spieler/Session für eine
+  spätere Statistik-Ansicht?
+
+**Status:** Nicht begonnen.
