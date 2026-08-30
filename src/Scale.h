@@ -86,6 +86,36 @@ private:
     static constexpr unsigned long AUTO_ZERO_INTERVAL_MS = 8000;
     unsigned long lastAutoZeroMs = 0;
 
+    // Schock-Nullpunkt-Korrektur: guenstige Single-Point-Waegezellen koennen
+    // bei ruckartiger Entlastung (Glas schnell hochreissen - genau die im
+    // Partyspiel gewuenschte Bewegung, siehe Live-Test 30.08.) einen
+    // spuerbaren Nullpunkt-Versatz "einfrieren", der weit ausserhalb von
+    // AUTO_ZERO_BAND_G liegt und sich ohne Gegenmassnahme NIE wieder
+    // von selbst erholt (beobachtet: -175g dauerhaft haengengeblieben,
+    // trotz mehrfachem Auf-/Abladen danach). Ein stabil eingependelter
+    // NEGATIVER Wert ist aber immer eindeutig falsch - nichts auf der
+    // Waage kann negativ wiegen -, also risikolos sofort korrigierbar,
+    // ohne auf AUTO_ZERO_INTERVAL_MS zu warten (das Intervall schuetzt nur
+    // vor faelschlichem Wegtarieren eines leichten, absichtlich
+    // aufgestellten Objekts - bei einem negativen Wert kann das per
+    // Definition nicht der Fall sein).
+    //
+    // Wartet NICHT auf den vollen Smart-Filter-STABLE-Zustand (der braucht
+    // BREWING(2s) + TRANSITIONING(2s) = ca. 6s Ruhe, viel zu lange fuers
+    // Partyspiel - Live-Test 30.08.: -120g blieb spuerbar lange sichtbar
+    // stehen). Nutzt stattdessen einen eigenen, viel kuerzeren Ruhe-Check
+    // (NEGATIVE_DRIFT_SETTLE_MS) direkt auf lastActivity - reicht als
+    // Absicherung gegen das mechanische Nachschwingen, ist aber deutlich
+    // schneller. Wichtig auch fuers App-seitige Ritual: die Korrektur selbst
+    // ist ein abrupter Sprung (z.B. -120g -> 0g) - je laenger das
+    // Zeitfenster bis zur Korrektur, desto groesser die Chance, dass er
+    // zufaellig mit einer echten Gewichtsaenderung zusammenfaellt und sich
+    // beide zu einem viel zu grossen Wert addieren (beobachtet: ein
+    // kleiner Schluck wurde durch so eine Ueberschneidung als 140g
+    // gewertet).
+    static constexpr float NEGATIVE_DRIFT_THRESHOLD_G = -2.0f;
+    static constexpr unsigned long NEGATIVE_DRIFT_SETTLE_MS = 1000;
+
     void initializeSamples(float initialValue);
     float medianFilter(int samples);
     float averageFilter(int samples);

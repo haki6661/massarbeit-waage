@@ -139,12 +139,21 @@ void setup() {
                    ESP.getChipModel(), ESP.getChipRevision(), ESP.getFreeHeap());
 
     esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
-    if (wakeupCause == ESP_SLEEP_WAKEUP_EXT0) {
+    bool wokeFromSleep = wakeupCause == ESP_SLEEP_WAKEUP_EXT0;
+    if (wokeFromSleep) {
         Serial.println("[Power] Aufgewacht aus Deep Sleep (Taste 2).");
     }
 
-    // Muss VOR allem anderen geprueft werden, das Taste 2 anfasst.
-    bootDevOtaRequested = DevOta::bootHeld();
+    // Muss VOR allem anderen geprueft werden, das Taste 2 anfasst. NICHT
+    // pruefen, wenn dieser Boot ein Aufwachen aus dem Deep Sleep ist: das
+    // passiert ja GENAU ueber Taste 2 (siehe enterDeepSleep()/ext0-Wakeup),
+    // die ist beim Hochfahren durch den Aufweck-Tastendruck zwangslaeufig
+    // noch gehalten (Loslassen braucht laenger als die 20ms-Entprellung in
+    // bootHeld()). Ohne diese Ausnahme startete jedes Aufwachen faelschlich
+    // DevOta::begin() - blockiert bis zu 15s beim (mangels echter WLAN-
+    // Zugangsdaten aussichtslosen) Verbindungsversuch, wodurch die
+    // Boot-Sprite-Animation fuer die ganze Zeit eingefroren wirkte.
+    bootDevOtaRequested = !wokeFromSleep && DevOta::bootHeld();
     devOtaActive = bootDevOtaRequested;
 
     display.begin();
