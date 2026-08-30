@@ -25,6 +25,12 @@ bool calibrationRequested = false;
 bool sleepRequested = false;
 bool devOtaActive = false;
 
+// Fuer runNextBootStep() (siehe unten) - muss ausserhalb von setup() stehen,
+// weil TftDisplay::playBootSprite() zwischen den Sprite-Frames darauf
+// zugreift, waehrend setup() selbst noch "pausiert" (in playBootSprite()).
+bool bootDevOtaRequested = false;
+bool bootHx711Ok = true;
+
 // Fuer den Auto-Sleep-Timer: letzter Zeitpunkt mit "Aktivitaet" (Gewichts-
 // aenderung oder Tastendruck). Bei Ueberschreiten von AUTO_SLEEP_TIMEOUT_MS
 // ohne neue Aktivitaet geht die Waage automatisch schlafen (siehe loop()).
@@ -77,10 +83,51 @@ void enterDeepSleep() {
     // Wird nie erreicht.
 }
 
+// Wird von TftDisplay::playBootSprite() zwischen jedem angezeigten Frame
+// aufgerufen - erledigt EINEN Initialisierungsschritt pro Aufruf und gibt
+// true zurueck, solange noch etwas zu tun ist. So laeuft die Bootanimation
+// parallel zur echten Initialisierung, statt hinterher eine feste Dauer
+// draufzuschlagen (siehe ROADMAP.md, Punkt 2).
+bool runNextBootStep() {
+    static uint8_t step = 0;
+    switch (step++) {
+        case 0:
+            battery.begin();
+            return true;
+        case 1:
+            buttons.begin();
+            buttons.onTare(onTareClick);
+            buttons.onSleepLongPress(onSleepLongPress);
+            buttons.onModeClick(onModeClick);
+            buttons.onCalibrationLongPress(onCalibrationLongPress);
+            return true;
+        case 2:
+            bootHx711Ok = scale.begin();
+            return true;
+        case 3:
+            bleService.begin();
+            return true;
+        case 4:
+            if (bootDevOtaRequested) {
+                devOta.begin();
+            } else {
+                Serial.println("[Setup] Taste 2 beim Boot nicht gehalten - Dev-OTA/WLAN bleibt aus.");
+            }
+            return true;
+        default:
+            return false; // fertig
+    }
+}
+
 void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
     uint32_t waitStart = millis();
-    while (!Serial && millis() - waitStart < 3000) {
+    // Nur kurz auf einen bereits offenen Serial Monitor warten (z.B. `pio
+    // device monitor`, das kurz vor dem Einschalten schon laeuft) - im
+    // normalen Party-Betrieb (Akku, kein USB-Kabel/Monitor) wuerde das
+    // bisherige 3s-Timeout jedes Mal ungenutzt verstreichen, bevor ueberhaupt
+    // mit der eigentlichen Initialisierung begonnen wird (siehe ROADMAP.md).
+    while (!Serial && millis() - waitStart < 300) {
         delay(10);
     }
 
@@ -97,44 +144,28 @@ void setup() {
     }
 
     // Muss VOR allem anderen geprueft werden, das Taste 2 anfasst.
-    bool devOtaRequested = DevOta::bootHeld();
-    devOtaActive = devOtaRequested;
+    bootDevOtaRequested = DevOta::bootHeld();
+    devOtaActive = bootDevOtaRequested;
 
     display.begin();
-    display.showMessage("Massarbeit Waage", "Starte...");
 
-    battery.begin();
+    // Kein Text-Zwischenscreen mehr davor ("Starte...") - die Sprite-
+    // Animation (data/boot/, siehe playBootSprite()) laeuft direkt los und
+    // erledigt die eigentliche Initialisierung (battery/buttons/scale/BLE,
+    // siehe runNextBootStep() oben) parallel dazu, statt hinterher eine
+    // feste Dauer draufzuschlagen.
+    display.playBootSprite(runNextBootStep);
 
-    buttons.begin();
-    buttons.onTare(onTareClick);
-    buttons.onSleepLongPress(onSleepLongPress);
-    buttons.onModeClick(onModeClick);
-    buttons.onCalibrationLongPress(onCalibrationLongPress);
-
-    bool hx711Ok = scale.begin();
-    if (!hx711Ok) {
+    if (!bootHx711Ok) {
         display.showMessage("Fehler", "HX711 antwortet\nnicht. Verkabelung\npruefen.");
         Serial.println("[Setup] WARNUNG: Waage laeuft ohne HX711 weiter (liefert 0g).");
         delay(2000);
-    }
-
-    bleService.begin();
-
-    if (devOtaRequested) {
-        devOta.begin();
-    } else {
-        Serial.println("[Setup] Taste 2 beim Boot nicht gehalten - Dev-OTA/WLAN bleibt aus.");
     }
 
     Serial.println("[Setup] Bereit.");
     Serial.println("Taste 1: Tara (kurz) / Deep Sleep (2s halten)");
     Serial.println("Taste 2: Status-Anzeige (kurz) / Kalibrierung (lang halten)");
     Serial.printf("[Power] Auto-Sleep nach %lu Minuten Inaktivitaet.\n", AUTO_SLEEP_TIMEOUT_MS / 60000UL);
-
-    // Animierte Startsequenz (wackelnde Balkenwaage + Boot-Checks), bevor es
-    // in die normale Gewichtsanzeige uebergeht - blockierend, siehe
-    // TftDisplay::playBootAnimation().
-    display.playBootAnimation(hx711Ok, battery.readVoltage(), /*bleStarted=*/true);
 
     lastActivityMs = millis();
 }

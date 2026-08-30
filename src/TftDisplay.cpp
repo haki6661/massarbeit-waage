@@ -1,5 +1,6 @@
 #include "TftDisplay.h"
 #include "BoardConfig.h"
+#include <SPIFFS.h>
 #include <math.h>
 
 namespace {
@@ -208,89 +209,73 @@ void TftDisplay::renderStatusScreen(float rawReading, bool hx711Connected, bool 
     gfx_->print("Taste2: zurueck zur Waage");
 }
 
-void TftDisplay::playBootAnimation(bool hx711Connected, float batteryVoltage, bool bleStarted) {
-    constexpr int16_t pivotX = 70;
-    constexpr int16_t pivotY = 55;
-    constexpr int16_t beamLen = 40;
-    constexpr int16_t standBottomY = 105;
+void TftDisplay::playBootSprite(bool (*stepInit)()) {
+    constexpr int16_t SPRITE_W = 320;
+    constexpr int16_t SPRITE_H = 170;
+    constexpr uint8_t FRAME_COUNT = 50;
+    // Mindestens so lange sichtbar, auch wenn stepInit() sofort fertig ist -
+    // sonst waere bei einem sehr schnellen Boot nur ein einzelner Frame zu
+    // sehen. Kein festes Maximum: laeuft weiter (von vorn), bis stepInit()
+    // fertig ist UND diese Mindestdauer erreicht ist.
+    constexpr uint32_t MIN_VISIBLE_MS = 700;
 
-    // Phase 1 (~1,4s): eine Balkenwaage pendelt sich gedaempft ein, statt
-    // eines starren Logos - passt zum Produkt (Praezisionswaage) und
-    // braucht keine Sprite-/Bitmap-Assets, nur Linien/Kreise wie die
-    // "Ball fliegt"-Animation in renderRemoteCueScreen().
-    uint32_t phaseStart = millis();
-    constexpr uint32_t swingDurationMs = 1400;
-    while (millis() - phaseStart <= swingDurationMs) {
-        float t = (millis() - phaseStart) / 1000.0f;
-        float angle = 0.55f * expf(-2.6f * t) * sinf(2.0f * PI * 2.1f * t);
-
-        gfx_->fillScreen(BLACK);
-
-        gfx_->drawFastVLine(pivotX, pivotY, standBottomY - pivotY, creamColor_);
-        gfx_->fillTriangle(pivotX - 14, standBottomY, pivotX + 14, standBottomY, pivotX, standBottomY - 14, creamColor_);
-
-        float dx = cosf(angle) * beamLen;
-        float dy = sinf(angle) * beamLen;
-        int16_t leftX  = pivotX - (int16_t)dx, leftY  = pivotY - (int16_t)dy;
-        int16_t rightX = pivotX + (int16_t)dx, rightY = pivotY + (int16_t)dy;
-        gfx_->drawLine(leftX, leftY, rightX, rightY, creamColor_);
-        gfx_->fillCircle(pivotX, pivotY, 3, creamColor_);
-
-        gfx_->drawFastVLine(leftX, leftY, 8, COLOR_MUTED);
-        gfx_->drawFastVLine(rightX, rightY, 8, COLOR_MUTED);
-        gfx_->drawCircle(leftX, leftY + 8, 8, emberColor_);
-        gfx_->drawCircle(rightX, rightY + 8, 8, zestColor_);
-
-        gfx_->setTextSize(2);
-        gfx_->setTextColor(WHITE);
-        gfx_->setCursor(140, 40);
-        gfx_->print("Massarbeit");
-        gfx_->setCursor(140, 62);
-        gfx_->print("Waage");
-
-        delay(20); // ~50fps
+    if (!SPIFFS.begin(true)) {
+        Serial.println("[Boot] SPIFFS-Mount fehlgeschlagen - Sprite-Animation uebersprungen.");
+        while (stepInit()) {
+            // trotzdem alle Initialisierungsschritte durchlaufen, sonst
+            // bleibt die Waage ohne Anzeige haengen.
+        }
+        return;
     }
 
-    // Phase 2: Boot-Checks (HX711/Akku/BLE) einzeln einblenden statt als
-    // fertigen Textblock - jede Zeile bekommt einen kleinen farbigen Chip
-    // statt eines reinen Textpraefixes, angelehnt an die "Chunky"-UI-Sprache
-    // der Handy-App.
-    gfx_->fillScreen(BLACK);
-    gfx_->setTextSize(2);
-    gfx_->setTextColor(WHITE);
-    gfx_->setCursor(8, 8);
-    gfx_->print("Massarbeit Waage");
+    // Auf dem Heap statt `static` - beides zusammen sind ~55KB, die nur
+    // waehrend der Bootanimation gebraucht werden. `static` wuerde sie fuer
+    // die gesamte Laufzeit blockieren (BLE/HX711 brauchen den Speicher
+    // danach). Ein einfacher lokaler Stack-Array waere dagegen zu gross
+    // fuer den Task-Stack (deutlich unter 55KB) - deshalb new[]/delete[].
+    uint16_t* palette = new uint16_t[256]();
+    uint8_t* frameBuf = new uint8_t[SPRITE_W * SPRITE_H];
 
-    char battBuf[16];
-    if (batteryVoltage > 0.1f) {
-        snprintf(battBuf, sizeof(battBuf), "%.2f V", batteryVoltage);
+    // Palette einmalig laden (512 Byte, 256 Eintraege je 16-Bit RGB565).
+    File palFile = SPIFFS.open("/boot/pal.raw", "r");
+    if (palFile) {
+        palFile.read(reinterpret_cast<uint8_t*>(palette), 256 * sizeof(uint16_t));
+        palFile.close();
     } else {
-        snprintf(battBuf, sizeof(battBuf), "USB");
+        Serial.println("[Boot] Palette (data/boot/pal.raw) fehlt - `pio run -t uploadfs` vergessen?");
     }
 
-    struct Check { const char* label; bool ok; const char* value; };
-    const Check checks[] = {
-        { "HX711", hx711Connected, hx711Connected ? "OK" : "Fehler" },
-        { "Akku",  true,           battBuf },
-        { "BLE",   bleStarted,     bleStarted ? "gestartet" : "Fehler" },
-    };
+    uint32_t startMs = millis();
+    bool initDone = false;
+    uint8_t frameIndex = 0;
+    bool loggedMissingFrame = false;
 
-    int16_t y = 40;
-    for (const Check& check : checks) {
-        uint16_t color = check.ok ? zestColor_ : RED;
-        gfx_->fillRoundRect(8, y, 10, 10, 2, color);
-        gfx_->setTextSize(1);
-        gfx_->setTextColor(WHITE);
-        gfx_->setCursor(24, y + 1);
-        gfx_->print(check.label);
-        gfx_->setTextColor(color);
-        gfx_->setCursor(90, y + 1);
-        gfx_->print(check.value);
-        y += 18;
-        delay(220);
+    while (true) {
+        char path[24];
+        snprintf(path, sizeof(path), "/boot/f%03u.raw", frameIndex);
+        File frameFile = SPIFFS.open(path, "r");
+        if (frameFile) {
+            frameFile.read(frameBuf, SPRITE_W * SPRITE_H);
+            frameFile.close();
+            gfx_->drawIndexedBitmap(0, 0, frameBuf, palette, SPRITE_W, SPRITE_H);
+        } else if (!loggedMissingFrame) {
+            Serial.printf("[Boot] Frame-Datei fehlt: %s - `pio run -t uploadfs` vergessen?\n", path);
+            loggedMissingFrame = true; // nicht bei jedem Frame erneut spammen
+        }
+
+        if (!initDone) {
+            initDone = !stepInit();
+        }
+
+        frameIndex = (frameIndex + 1) % FRAME_COUNT;
+
+        if (initDone && (millis() - startMs) >= MIN_VISIBLE_MS) {
+            break;
+        }
     }
 
-    delay(500);
+    delete[] palette;
+    delete[] frameBuf;
 
     // Sofort sichtbar, nicht erst nach dem 150ms-Drossel-Timer des naechsten
     // update()-Aufrufs.
