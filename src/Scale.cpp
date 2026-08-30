@@ -42,6 +42,7 @@ bool Scale::begin() {
     isConnected = true;
     Serial.println("[Scale] HX711 verbunden. Tariere...");
     hx711.tare();
+    lastAutoZeroMs = millis();
     Serial.println("[Scale] Bereit.");
     return true;
 }
@@ -59,6 +60,7 @@ void Scale::tare(uint8_t times) {
     lastActivity = 0;
     currentWeight = 0.0f;
     samplesInitialized = false;
+    lastAutoZeroMs = millis(); // frische Tara zaehlt schon als "gerade nachgezogen"
     Serial.println("[Scale] Tara fertig.");
 }
 
@@ -153,6 +155,20 @@ float Scale::getWeight() {
     }
 
     currentWeight = filtered;
+
+    // Auto-Zero-Nachfuehrung (siehe Scale.h) - nur wenn wirklich ruhig UND
+    // nahe Null, sonst wuerde ein leichtes, absichtlich aufgestelltes Objekt
+    // faelschlich weggetart. hx711.tare() statt Scale::tare(): wenige Samples,
+    // kein Reset des Smart-Filter-Zustands/Log-Rauschens noetig - reine
+    // Drift-Korrektur im Hintergrund.
+    if (currentFilterState == STABLE && fabsf(currentWeight) < AUTO_ZERO_BAND_G &&
+        now - lastAutoZeroMs > AUTO_ZERO_INTERVAL_MS) {
+        hx711.tare(5);
+        currentWeight = 0.0f;
+        initializeSamples(0.0f);
+        lastAutoZeroMs = now;
+    }
+
     return currentWeight;
 }
 
