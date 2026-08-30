@@ -59,6 +59,24 @@ private:
     static const int MEDIAN_SAMPLES = 3;
     static const int AVERAGE_SAMPLES = 2;
 
+    // Auto-Zero-Nachfuehrung: HX711/Waegezelle driften nach dem Einschalten
+    // spuerbar (thermisches Einschwingen ueber mehrere Minuten, typisch fuer
+    // guenstige Zellen) - ohne Gegenmassnahme wandert die Anzeige bei leerer
+    // Waage langsam von 0g weg, auch ganz ohne Aktivitaet. Loesung wie bei
+    // echten Kuechen-/Briefwaagen ueblich: liegt der gefilterte Wert laenger
+    // als AUTO_ZERO_INTERVAL_MS ruhig innerhalb eines kleinen Bands um Null,
+    // automatisch nachtarieren (siehe getWeight()) - faengt die Drift
+    // periodisch ab, ohne ein absichtlich aufgestelltes Glas zu beeinflussen
+    // (die sind alle deutlich schwerer als das Band).
+    // Band bewusst grosszuegig (aber weit unter jedem echten Glas/Becher,
+    // siehe MockWeightSource im App-Repo: 220-400g) UND Intervall bewusst
+    // kurz - sonst kann die Drift aus dem Band herauslaufen, bevor
+    // ueberhaupt einmal nachgetart wurde, und faengt sich danach nie wieder
+    // ein (die Pruefung unten greift nur INNERHALB des Bands).
+    static constexpr float AUTO_ZERO_BAND_G = 10.0f;
+    static constexpr unsigned long AUTO_ZERO_INTERVAL_MS = 8000;
+    unsigned long lastAutoZeroMs = 0;
+
     void initializeSamples(float initialValue);
     float medianFilter(int samples);
     float averageFilter(int samples);
