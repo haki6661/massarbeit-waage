@@ -158,6 +158,8 @@ Result) geplant ist.
 aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
 `massarbeit_waage_base.stl`/`massarbeit_waage_platform.stl`).
 
+**Referenz/Inspiration:** [Smart DIY Kitchen Scale for Precision Cooking (instructables.com)](https://www.instructables.com/Smart-DIY-Kitchen-Scale-for-Precision-Cooking/)
+
 **Offene Fragen, noch nicht entschieden:**
 
 - Was genau soll sich ändern - Optik/Formsprache, Material-/Druckbarkeit
