@@ -106,3 +106,45 @@ tatsächlichen Alkoholkonsum als reines Geschicklichkeitsspiel nutzen.
 - Eigenes `GameKind` oder Sonderfall im bestehenden Katalog?
 
 **Status:** Nicht begonnen.
+
+## 5. Neuer Spielmodus: "Boxen" (Survival mit Lebensanzeige, Abweichung als Schaden)
+
+**Idee:** Angelehnt an das ungeplugged Trinkspiel "Grammtrinken" (siehe
+Recherche im Chat, z.B.
+[mybeerpong.com/blogs/trinkspiele/grammtrinken](https://mybeerpong.com/blogs/trinkspiele/grammtrinken)):
+reihum bestimmt ein Spieler per eigenem, zufälligem Schluck die
+Grammzahl, die die anderen treffen müssen. Anders als bei Golf/Dart -
+deren Ergebnis pro Runde für sich steht - wird hier die Abweichung vom
+Zielwert Runde für Runde **aufsummiert** ("Schaden"). Ab einem
+Schadens-Schwellwert ist ein Spieler "K.O." und scheidet aus - daher der
+Name "Boxen".
+
+**Warum:** Deckt einen Mechanismus ab, den es im bestehenden Katalog noch
+nicht gibt (laufendes Punktekonto/Ausscheiden statt unabhängiger
+Einzelrunden) - mehr Spannung über eine ganze Session statt nur je Zug.
+
+**Lebensanzeige in Retro-Pixel-Optik:** Statt reinem Zahlenwert soll der
+verbleibende "Lebensbalken" auf dem Waagen-Display als Pixel-Art-Element
+dargestellt werden, sinkend mit jedem Treffer - passend zum bereits
+geplanten Ausbau der Pixel-Art-Animationen für weitere Game-States (siehe
+Chat-Diskussion zu Boot-Sprite/SD-Karten-Speicherlösung, noch nicht als
+eigener Roadmap-Punkt festgehalten). Setzt also auf denselben
+Sprite-Player auf, der ohnehin für die anderen Zustände (Ready/Away/
+Result) geplant ist.
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Schadens-Schwellwert für K.O. (Vorlage "Grammtrinken" nutzt 100g
+  Gesamtabweichung) - fix oder einstellbar?
+- Wie viele "Leben"/wie grob die Lebensanzeige gestuft (z.B. 5-10 Segmente
+  in Pixel-Optik) im Verhältnis zum Schadens-Schwellwert?
+- Wer bestimmt den Zielwert je Runde - wie beim Vorbild reihum per
+  eigenem Schluck eines Spielers, oder wie bei den bestehenden Spielen von
+  der App vorgegeben/gewürfelt?
+- Eigenes `GameKind` (mit eigenem Icon/Away-Animation) - Boxhandschuh als
+  Motiv?
+- Verhalten bei mehreren verbleibenden Spielern - Session endet mit dem
+  letzten Überlebenden (Battle-Royale-Stil), oder feste Rundenzahl mit
+  Rangliste nach verbleibendem Schaden?
+
+**Status:** Nicht begonnen.
