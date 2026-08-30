@@ -29,7 +29,11 @@ void TftDisplay::begin() {
         /*col offset2=*/35, /*row offset2=*/0);
 
     gfx_->begin();
-    gfx_->setRotation(1); // Querformat, 320x170
+    // Querformat, 320x170. Rotation 3 statt 1 - beide sind Querformat
+    // (width/height vertauscht gegenueber Portrait), aber 180 Grad
+    // zueinander gedreht (siehe Arduino_GFX::setRotation()) - je nachdem,
+    // wie das Board eingebaut/gehalten wird.
+    gfx_->setRotation(3);
     gfx_->fillScreen(BLACK);
     gfx_->setTextColor(WHITE);
 }
