@@ -25,4 +25,11 @@ private:
 
     // Blockiert, bis eine nicht-leere Zeile ueber Serial ankommt.
     String readSerialLine();
+
+    // Blockiert, bis IRGENDEIN Byte ueber Serial ankommt - fuer reine
+    // "weiter"-Bestaetigungen (z.B. "Waage leeren, dann Enter"), bei denen
+    // der Inhalt egal ist. Ein blosses Enter druecken reicht hier bewusst,
+    // anders als bei readSerialLine() (das fuer Werte wie das Referenz-
+    // gewicht mindestens ein Zeichen vor dem Enter braucht).
+    void waitForAnyInput();
 };

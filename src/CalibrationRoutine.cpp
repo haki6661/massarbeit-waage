@@ -30,6 +30,21 @@ String CalibrationRoutine::readSerialLine() {
     }
 }
 
+void CalibrationRoutine::waitForAnyInput() {
+    uint32_t lastPromptMs = millis();
+    while (!Serial.available()) {
+        if (millis() - lastPromptMs > 15000) {
+            Serial.println("[Kalibrierung] Warte auf Eingabe im Serial Monitor (einfach Enter druecken reicht)...");
+            lastPromptMs = millis();
+        }
+        delay(10);
+    }
+    // Puffer leeren, damit keine Reste (z.B. ein einzelnes \n) die naechste
+    // readSerialLine()-Zeile verfaelschen.
+    delay(20); // kurz warten, falls noch mehr Bytes unterwegs sind (z.B. \r\n als zwei Events)
+    while (Serial.available()) Serial.read();
+}
+
 void CalibrationRoutine::run() {
     Serial.println();
     Serial.println("==================================================");
@@ -38,7 +53,7 @@ void CalibrationRoutine::run() {
 
     display_.showMessage("Kalibrierung", "Waage leeren,\ndann Enter im\nSerial Monitor.");
     Serial.println("[Kalibrierung] Waage leeren und Enter druecken...");
-    readSerialLine();
+    waitForAnyInput();
 
     scale_.tare();
     Serial.println("[Kalibrierung] Tariert.");
@@ -64,6 +79,23 @@ void CalibrationRoutine::run() {
     }
 
     float newFactor = static_cast<float>(raw) / knownWeightGrams;
+
+    // Plausibilitaetspruefung: ein negativer oder betragsmaessig winziger
+    // Faktor bedeutet praktisch immer, dass beim Ablesen kein (oder das
+    // falsche) Gewicht auf der Waage stand - z.B. wenn der Referenz-
+    // gegenstand noch nicht ganz aufgesetzt/eingeschwungen war. So ein
+    // Faktor wuerde die Waage duetlich schlechter machen als der bisherige
+    // (z.B. Gewichte mit falschem Vorzeichen anzeigen) - lieber abbrechen
+    // und zum erneuten Versuch auffordern, statt ihn zu speichern.
+    if (newFactor <= 1.0f) {
+        Serial.printf("[Kalibrierung] FEHLER: Unplausibler Faktor %.6f (Rohwert=%ld) - "
+                      "stand das Referenzgewicht wirklich schon stabil auf der Waage? "
+                      "Abgebrochen, alter Faktor bleibt erhalten.\n", newFactor, raw);
+        display_.showMessage("Kalibrierung", "Fehler: Wert\nunplausibel.\nBitte erneut\nversuchen.");
+        delay(2500);
+        return;
+    }
+
     scale_.set_scale(newFactor); // speichert automatisch ins NVS
 
     Serial.printf("[Kalibrierung] Fertig. Rohwert=%ld, Referenz=%.2fg, neuer Faktor=%.6f\n",
