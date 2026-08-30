@@ -143,8 +143,8 @@ Result) geplant ist.
   der App vorgegeben/gewürfelt?
 - Eigenes `GameKind` (mit eigenem Icon/Away-Animation) - Boxhandschuh als
   Motiv?
-- Verhalten bei mehreren verbleibenden Spielern - Session endet mit dem
-  letzten Überlebenden (Battle-Royale-Stil), oder feste Rundenzahl mit
-  Rangliste nach verbleibendem Schaden?
+
+**Entschieden:** Session endet mit dem letzten Überlebenden
+(Battle-Royale-Stil) - kein Fixrunden-/Ranglistenmodus.
 
 **Status:** Nicht begonnen.
