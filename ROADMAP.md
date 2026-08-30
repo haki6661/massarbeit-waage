@@ -138,13 +138,16 @@ Result) geplant ist.
   Gesamtabweichung) - fix oder einstellbar?
 - Wie viele "Leben"/wie grob die Lebensanzeige gestuft (z.B. 5-10 Segmente
   in Pixel-Optik) im Verhältnis zum Schadens-Schwellwert?
-- Wer bestimmt den Zielwert je Runde - wie beim Vorbild reihum per
-  eigenem Schluck eines Spielers, oder wie bei den bestehenden Spielen von
-  der App vorgegeben/gewürfelt?
 - Eigenes `GameKind` (mit eigenem Icon/Away-Animation) - Boxhandschuh als
   Motiv?
 
-**Entschieden:** Session endet mit dem letzten Überlebenden
-(Battle-Royale-Stil) - kein Fixrunden-/Ranglistenmodus.
+**Entschieden:**
+- Session endet mit dem letzten Überlebenden (Battle-Royale-Stil) - kein
+  Fixrunden-/Ranglistenmodus.
+- Zielwert je Runde wird reihum von einem Spieler per eigenem,
+  zufälligem Schluck vorgegeben (wie beim Vorbild "Grammtrinken") - nicht
+  von der App vorgegeben/gewürfelt wie bei den bestehenden Spielen. Der
+  Vorgeber selbst nimmt in dieser Runde nicht am Matchen teil, die
+  übrigen Spieler müssen seinen Wert treffen.
 
 **Status:** Nicht begonnen.
