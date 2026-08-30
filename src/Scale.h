@@ -54,7 +54,16 @@ private:
     FilterState currentFilterState = STABLE;
     unsigned long lastActivity = 0;
 
-    static constexpr float ACTIVITY_THRESHOLD = 0.2f;      // g Aenderung, die als "Aktivitaet" zaehlt
+    // War 0.2g - lag deutlich UNTER dem normalen Einzelsample-Rauschen von
+    // HX711+Waegezelle (per Live-Test ca. +/-1-3g, siehe Commit-Historie).
+    // Ergebnis: der Filter blieb dauerhaft im BREWING-Zustand (ganz normales
+    // Rauschen wurde staendig als "Aktivitaet" gewertet) und erreichte nie
+    // STABLE - wodurch auch die Auto-Zero-Nachfuehrung (an STABLE gekoppelt,
+    // s.u.) faktisch nie griff und sich Drift ueber mehrere Minuten
+    // unbemerkt aufaddieren konnte. Jetzt bewusst ueber dem beobachteten
+    // Rauschband, aber weit unter jedem echten Glas/Objekt (>>5g, siehe
+    // "grosse Spruenge sofort uebernehmen" unten).
+    static constexpr float ACTIVITY_THRESHOLD = 4.0f;      // g Aenderung, die als "Aktivitaet" zaehlt
     static constexpr unsigned long STABILITY_TIMEOUT = 2000; // ms Ruhe, bis wieder als stabil gilt
     static const int MEDIAN_SAMPLES = 3;
     static const int AVERAGE_SAMPLES = 2;
