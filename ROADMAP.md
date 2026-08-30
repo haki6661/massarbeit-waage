@@ -37,7 +37,7 @@ jemand zuerst am Handy den Katalog öffnen muss.
 ## 2. Boot beschleunigen, kein "Starte..."-Text mehr
 
 **Status:** ✅ Erledigt. `TftDisplay::playBootSprite()` zeigt sofort die
-Pixel-Art-Sprite-Animation (`data/boot/`, siehe deren README) - kein
+Pixel-Art-Sprite-Animation (`data/`, siehe deren README) - kein
 Text-Screen mehr davor. Läuft parallel zur echten Initialisierung
 (`runNextBootStep()` in `main.cpp` erledigt battery/buttons/scale/BLE
 einen Schritt pro gezeigtem Frame) statt hinterher eine feste Dauer

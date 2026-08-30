@@ -212,15 +212,10 @@ void TftDisplay::renderStatusScreen(float rawReading, bool hx711Connected, bool 
 void TftDisplay::playBootSprite(bool (*stepInit)()) {
     constexpr int16_t SPRITE_W = 320;
     constexpr int16_t SPRITE_H = 170;
-    constexpr uint8_t FRAME_COUNT = 50;
-    // Mindestens so lange sichtbar, auch wenn stepInit() sofort fertig ist -
-    // sonst waere bei einem sehr schnellen Boot nur ein einzelner Frame zu
-    // sehen. Kein festes Maximum: laeuft weiter (von vorn), bis stepInit()
-    // fertig ist UND diese Mindestdauer erreicht ist.
-    constexpr uint32_t MIN_VISIBLE_MS = 700;
+    constexpr uint8_t FRAME_COUNT = 34;
 
     // Fehlende Palette/Frames (z.B. nach einem BLE-Update von einer alten
-    // Firmware, die noch kein data/boot/ auf SPIFFS geschrieben hat - ein
+    // Firmware, die noch kein data/ auf SPIFFS geschrieben hat - ein
     // App-BLE-Update ueberträgt nur die App-Partition, nie die SPIFFS-
     // Partition, siehe README "Firmware-Update per BLE") duerfen den Boot
     // NICHT aufhalten - die Schleife unten faengt das pro Frame ab (leerer
@@ -243,27 +238,42 @@ void TftDisplay::playBootSprite(bool (*stepInit)()) {
     uint8_t* frameBuf = new uint8_t[SPRITE_W * SPRITE_H];
 
     // Palette einmalig laden (512 Byte, 256 Eintraege je 16-Bit RGB565).
-    File palFile = SPIFFS.open("/boot/pal.raw", "r");
+    // Bewusst FLACH (kein Unterordner) - SPIFFS' Pfadaufloesung fuer
+    // Unterordner ist unzuverlaessig: stat() auf einen Pfad mit Unterordner
+    // kann fehlschlagen und dann still auf einen (leeren) Directory-Handle
+    // zurueckfallen, der zwar als "geoeffnet" durchgeht, aber bei jedem
+    // read() 0 Byte liefert - kein Fehler, nur eine leere/schwarze Palette
+    // (so aufgefallen: Boot-Log ueber USB sah komplett fehlerfrei aus, das
+    // Display blieb trotzdem schwarz).
+    File palFile = SPIFFS.open("/pal.raw", "r");
     if (palFile) {
-        palFile.read(reinterpret_cast<uint8_t*>(palette), 256 * sizeof(uint16_t));
+        size_t got = palFile.read(reinterpret_cast<uint8_t*>(palette), 256 * sizeof(uint16_t));
         palFile.close();
+        if (got != 256 * sizeof(uint16_t)) {
+            Serial.printf("[Boot] Palette unvollstaendig gelesen: %u/%u Byte.\n", (unsigned)got, (unsigned)(256 * sizeof(uint16_t)));
+        }
     } else {
-        Serial.println("[Boot] Palette (data/boot/pal.raw) fehlt - `pio run -t uploadfs` vergessen?");
+        Serial.println("[Boot] Palette (data/pal.raw) fehlt - `pio run -t uploadfs` vergessen?");
     }
 
-    uint32_t startMs = millis();
     bool initDone = false;
     uint8_t frameIndex = 0;
+    uint32_t framesShown = 0;
     bool loggedMissingFrame = false;
 
     while (true) {
-        char path[24];
-        snprintf(path, sizeof(path), "/boot/f%03u.raw", frameIndex);
+        char path[16];
+        snprintf(path, sizeof(path), "/f%03u.raw", frameIndex);
         File frameFile = SPIFFS.open(path, "r");
         if (frameFile) {
-            frameFile.read(frameBuf, SPRITE_W * SPRITE_H);
+            size_t got = frameFile.read(frameBuf, SPRITE_W * SPRITE_H);
             frameFile.close();
-            gfx_->drawIndexedBitmap(0, 0, frameBuf, palette, SPRITE_W, SPRITE_H);
+            if (got == (size_t)(SPRITE_W * SPRITE_H)) {
+                gfx_->drawIndexedBitmap(0, 0, frameBuf, palette, SPRITE_W, SPRITE_H);
+            } else if (!loggedMissingFrame) {
+                Serial.printf("[Boot] Frame unvollstaendig gelesen: %s (%u/%u Byte).\n", path, (unsigned)got, (unsigned)(SPRITE_W * SPRITE_H));
+                loggedMissingFrame = true;
+            }
         } else if (!loggedMissingFrame) {
             Serial.printf("[Boot] Frame-Datei fehlt: %s - `pio run -t uploadfs` vergessen?\n", path);
             loggedMissingFrame = true; // nicht bei jedem Frame erneut spammen
@@ -274,8 +284,15 @@ void TftDisplay::playBootSprite(bool (*stepInit)()) {
         }
 
         frameIndex = (frameIndex + 1) % FRAME_COUNT;
+        framesShown++;
 
-        if (initDone && (millis() - startMs) >= MIN_VISIBLE_MS) {
+        // Mindestens einmal komplett durchlaufen, auch wenn stepInit() laengst
+        // fertig ist - sonst wurde bei einem schnellen Boot (siehe Kalibrierung/
+        // Serial-Log: Init in ~2s fertig) nur der Anfang der Animation gezeigt,
+        // nie der "Maßarbeit"-Schriftzug am Ende. Braucht die Initialisierung
+        // laenger als ein Durchlauf, laeuft die Animation einfach weiter
+        // (Endlosschleife), bis auch das fertig ist.
+        if (initDone && framesShown >= FRAME_COUNT) {
             break;
         }
     }

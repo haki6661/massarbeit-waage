@@ -61,17 +61,18 @@ public:
     void showMessage(const String& title, const String& body = "");
 
     // Animierte Startsequenz: spielt die Pixel-Art-Sprite-Animation aus
-    // data/boot/ (SPIFFS, siehe platformio.ini) - kein Text/Logo davor,
+    // data/ (SPIFFS, siehe platformio.ini) - kein Text/Logo davor,
     // die Animation selbst zeigt am Ende den Maßarbeit-Schriftzug. Ruft
     // zwischen jedem gezeigten Frame `stepInit()` auf, das den naechsten
     // Initialisierungsschritt erledigen und false zurueckgeben soll, sobald
     // nichts mehr zu tun ist - die Animation laeuft dadurch parallel zur
-    // echten Initialisierung statt eine feste Dauer aufzuschlagen, wickelt
-    // sich aber (fuer sehr schnelle Boots) nicht schneller als eine kurze
-    // Mindestdauer ab, damit man ueberhaupt etwas davon sieht. Braucht laut
-    // Init laenger als ein Durchlauf aller Frames, faengt die Animation
-    // einfach von vorne an (Endlosschleife, bis stepInit() fertig ist).
-    // Blockierend, einmalig in setup() - siehe main.cpp.
+    // echten Initialisierung statt eine feste Dauer aufzuschlagen. Spielt
+    // dabei IMMER mindestens einen kompletten Durchlauf aller Frames ab
+    // (bis zum Schriftzug), auch wenn stepInit() laengst vorher fertig ist -
+    // sonst waere bei einem schnellen Boot nur der Anfang zu sehen. Braucht
+    // die Initialisierung laenger als ein Durchlauf, laeuft die Animation
+    // einfach weiter (Endlosschleife), bis auch das fertig ist. Blockierend,
+    // einmalig in setup() - siehe main.cpp.
     void playBootSprite(bool (*stepInit)());
 
     // Von BleWeightService bei einem 0x10/0x11/0x12/0x13-Kommando aufgerufen.
