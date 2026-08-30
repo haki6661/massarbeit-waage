@@ -7,13 +7,18 @@ BleWeightService::BleWeightService(Scale& scale, TftDisplay& display, Battery& b
 void BleWeightService::begin() {
     Serial.println("[BLE] Initialisiere NimBLE...");
 
+    NimBLEDevice::init(BLE_DEVICE_NAME);
+
     // Groesseres MTU anfragen, bevor irgendetwas verbindet - der Firmware-
     // Update-Start-Befehl (21 Byte) und vor allem die Firmware-Chunks selbst
     // brauchen mehr als das Default-MTU (23, davon nur 20 Nutzlast). Moderne
     // Telefone handeln beim Verbinden ohnehin meist ein hohes MTU aus, das
     // hier gesetzte ist nur die vom Server erlaubte Obergrenze dafuer.
+    // MUSS NACH init() passieren: setMTU() ruft intern ble_att_set_preferred_mtu()
+    // auf, das auf NimBLE-Host-Mutexe zugreift, die erst init() anlegt - davor
+    // aufgerufen crasht zuverlaessig mit "assert failed: npl_freertos_mutex_pend
+    // ... (mu->handle)" (Boot-Loop, im Serial-Log zu sehen).
     NimBLEDevice::setMTU(247);
-    NimBLEDevice::init(BLE_DEVICE_NAME);
 
     server_ = NimBLEDevice::createServer();
     server_->setCallbacks(this);
