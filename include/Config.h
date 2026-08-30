@@ -55,17 +55,30 @@
 //                       (0 = daneben, 1 = nah dran, 2 = Volltreffer) -
 //                       Grundgeruest fuer spaeter geplante Animationen je
 //                       Guete-Stufe, aktuell nur Text/Farbe als Platzhalter.
-//   0x13               Display: Glas komplett von der Waage gehoben
-//                       ("Abschlag"/"Ball fliegt") - laeuft als Endlos-
-//                       Animation, bis 0x10/0x12 kommt. Wird gesendet, wenn
-//                       useSipDetector (App) einen zu grossen Gewichts-
-//                       abfall erkennt, um ihn NICHT als normalen Schluck zu
-//                       werten, sondern als "Glas weg, wird woanders
-//                       getrunken" - die tatsaechliche Menge wird erst beim
-//                       Zurueckstellen berechnet.
-// 0x10-0x13 loesen KEINE eigene Gewichtslogik aus, sie steuern nur, was
+//   0x13 <gameId>       Display: Glas komplett von der Waage gehoben
+//                       ("Abschlag") - laeuft als Endlos-Animation, bis
+//                       0x10/0x12 kommt. Welche Animation (Ball/Pfeil/Karte/
+//                       Block) haengt von <gameId> ab, siehe GameKind in
+//                       TftDisplay.h. Wird gesendet, wenn useSipDetector
+//                       (App) einen zu grossen Gewichtsabfall erkennt, um
+//                       ihn NICHT als normalen Schluck zu werten, sondern
+//                       als "Glas weg, wird woanders getrunken" - die
+//                       tatsaechliche Menge wird erst beim Zurueckstellen
+//                       berechnet.
+//   0x14 <gameId><r><g><b><nameLen><name>
+//                       Zug gestartet: aktiver Spieler + Spiel fuers
+//                       Display (Namens-/Farb-Badge oben auf dem Gewichts-
+//                       screen, siehe TftDisplay::setActivePlayer()).
+//                       <nameLen> = Anzahl der folgenden UTF-8-Bytes
+//                       (auf dem Display ohnehin auf ca. 10 Zeichen
+//                       abgeschnitten).
+//   0x15               Zug beendet / kein aktiver Spieler - Badge weg.
+// 0x10-0x15 loesen KEINE eigene Gewichtslogik aus, sie steuern nur, was
 // TftDisplay gerade zeigt - die Waage selbst weiss nichts vom Spielzustand,
 // die App entscheidet und schickt nur das Anzeige-Kommando.
+//
+// GameKind-Werte fuer <gameId> (0x13/0x14, siehe TftDisplay.h):
+//   0 = keins/generisch, 1 = Golf, 2 = Dart, 3 = Blackjack, 4 = Tower, 5 = Scale
 
 #define BLE_WEIGHT_NOTIFY_INTERVAL_MS 50 // 20x/s, wie im WeighMyBru2-Original
 #define BLE_BATTERY_NOTIFY_INTERVAL_MS 5000 // Akkustand aendert sich langsam - alle 5s reicht, spart Funkverkehr
