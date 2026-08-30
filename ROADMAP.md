@@ -152,7 +152,36 @@ Result) geplant ist.
 
 **Status:** Nicht begonnen.
 
-## 6. Neues Gehäuse für die Waage entwerfen und drucken
+## 7. Physische Güte-Anzeige (miss/close/perfect) für Golf wiederherstellen
+
+**Idee:** Golf zeigt seinen Reveal jetzt über ein eigenes "Grün" in der App
+(Ball + Fahne statt Tacho, siehe massarbeit-app PR #20) statt über den
+geteilten Tacho/`LiveDialConfig`. Nebeneffekt: `getLiveDialConfig()` liefert
+für Golf jetzt immer `null`, wodurch `classifySipQuality()` nie mehr
+aufgerufen wird und die Waage nach einem Golf-Schluck keine
+Güte-Rückmeldung (`showResultCue` / BLE-Kommando `0x12`, miss/close/perfect
+auf dem Display) mehr sendet.
+
+**Warum:** Konsistenz mit den anderen Spielen (Dart/Blackjack/Wackelturm
+zeigen die Güte auf dem physischen Display weiterhin), und die kurze
+Rückmeldung direkt auf der Waage war ein nettes Sofort-Feedback, bevor man
+überhaupt aufs Handy schaut.
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Eigener, schlankerer Weg für Spiele, Güte zu klassifizieren, ohne sich
+  für den (jetzt golfseitig ungenutzten) Tacho/`LiveDialConfig` zu
+  entscheiden - z.B. ein optionales `getSipQuality?(state, event)`-Feld auf
+  `GamePlugin`, das GameScreen direkt für `showResultCue` nutzt?
+- Oder `getLiveDialConfig()` für Golf doch mit echten Werten (`target` =
+  `remainingTargetM` VOR dem Schluck, `tolerance` = `SINK_TOLERANCE_M`)
+  füllen, aber `GameScreen` per Flag (z.B. `hasCustomReveal`) davon
+  abhalten, den Tacho selbst zu rendern - würde `classifySipQuality()`
+  unverändert weiter funktionieren lassen.
+
+**Status:** Nicht begonnen.
+
+## 8. Neues Gehäuse für die Waage entwerfen und drucken
 
 **Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Waage, statt des
 aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
