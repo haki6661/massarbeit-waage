@@ -60,13 +60,19 @@ public:
     // Kalibrierungs-Prompts, unabhaengig vom Drossel-Timer von update().
     void showMessage(const String& title, const String& body = "");
 
-    // Animierte Startsequenz: eine gedaempft schwingende, sich einpendelnde
-    // Balkenwaage (rein prozedural, kein Sprite/Bitmap noetig - siehe
-    // renderRemoteCueScreen()'s Ball-Flug-Animation fuer denselben Ansatz),
-    // danach die Boot-Checks (HX711/Akku/BLE) einzeln eingeblendet statt als
-    // einmaliger Textblock. Blockierend (~2,5s), einmalig in setup() vor der
-    // ersten normalen Anzeige - siehe main.cpp.
-    void playBootAnimation(bool hx711Connected, float batteryVoltage, bool bleStarted);
+    // Animierte Startsequenz: spielt die Pixel-Art-Sprite-Animation aus
+    // data/boot/ (SPIFFS, siehe platformio.ini) - kein Text/Logo davor,
+    // die Animation selbst zeigt am Ende den Maßarbeit-Schriftzug. Ruft
+    // zwischen jedem gezeigten Frame `stepInit()` auf, das den naechsten
+    // Initialisierungsschritt erledigen und false zurueckgeben soll, sobald
+    // nichts mehr zu tun ist - die Animation laeuft dadurch parallel zur
+    // echten Initialisierung statt eine feste Dauer aufzuschlagen, wickelt
+    // sich aber (fuer sehr schnelle Boots) nicht schneller als eine kurze
+    // Mindestdauer ab, damit man ueberhaupt etwas davon sieht. Braucht laut
+    // Init laenger als ein Durchlauf aller Frames, faengt die Animation
+    // einfach von vorne an (Endlosschleife, bis stepInit() fertig ist).
+    // Blockierend, einmalig in setup() - siehe main.cpp.
+    void playBootSprite(bool (*stepInit)());
 
     // Von BleWeightService bei einem 0x10/0x11/0x12/0x13-Kommando aufgerufen.
     // Ueberlagert die naechsten update()-Aufrufe, bis entweder explizit

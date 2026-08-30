@@ -8,12 +8,13 @@ fuer die Handy-Web-App (siehe Schwesterprojekt "Maßarbeit App"), TFT-Anzeige.
 
 Aktueller Stand: HX711-Handling + Kalibrierroutine + BLE-Gewichts-/Akkuservice
 (inkl. Fernsteuerung des Displays durch die App, siehe Abschnitt "BLE"
-weiter unten) + minimale TFT-Textausgabe + animierte Bootsequenz +
+weiter unten) + TFT-Anzeige mit Spieler-Badge und spielspezifischen
+Away-Animationen + Pixel-Art-Sprite-Bootanimation (siehe `data/boot/`) +
 Taster-Bedienung + Deep-Sleep-Stromsparmodus + Firmware-Update direkt aus der
 App per BLE (kein WLAN am Partyort nötig, siehe Abschnitt "Firmware-Update
-per BLE" weiter unten) + Entwicklungs-OTA per WLAN. Noch keine echten
-Pixel-Art-Sprite-Animationen, alle Animationen (Bootsequenz, "Ball fliegt")
-sind rein prozedural aus Linien/Kreisen/Formen.
+per BLE" weiter unten) + Entwicklungs-OTA per WLAN. Die Away-/Ergebnis-
+Animationen (nicht der Boot) sind weiterhin rein prozedural aus
+Linien/Kreisen/Formen, kein Sprite noetig.
 
 ## Hardware
 
@@ -57,11 +58,16 @@ src/
   Scale.h/.cpp           <- HX711 (aus WeighMyBru2 portiert)
   BleWeightService.h/.cpp <- NimBLE-Service: Gewicht + Akkustand (Notify) + Tare/Display-Kommandos (Write)
   Buttons.h/.cpp          <- physische Taster statt Touch-Pads (OneButton-Lib)
-  TftDisplay.h/.cpp       <- Arduino_GFX-Textausgabe + prozedurale Bootanimation
+  TftDisplay.h/.cpp       <- Arduino_GFX-Ausgabe: Gewicht/Status, Spieler-
+                            Badge, spielspezifische Away-Animationen,
+                            Sprite-Bootanimation (SPIFFS)
   Battery.h/.cpp          <- Akkuspannung (kalibrierter ADC, aus LilyGOs Beispiel) + Prozent-Schaetzung
   CalibrationRoutine.h/.cpp <- interaktive Kalibrierung ueber Serial+Taster
   OtaUpdater.h/.cpp        <- Firmware-Update per BLE (Chunks -> Update.h)
   DevOta.h/.cpp           <- WLAN + ArduinoOTA, nur fuer die Entwicklungsphase
+data/boot/
+  f000.raw … f049.raw     <- Boot-Sprite-Frames (SPIFFS, siehe data/boot/README.md)
+  pal.raw                 <- gemeinsame 256-Farben-Palette dafuer
 firmware/
   manifest.json          <- Version + Groesse + MD5 der aktuellen Release-.bin
   t-display-s3.bin        <- Release-Binary, von der App per BLE geladen
@@ -112,19 +118,31 @@ unten). Eine Write-Characteristic nimmt Kommandos entgegen:
 | `0x10` | Display zurück auf normale Gewichtsanzeige |
 | `0x11` | Display zeigt "Bereit, jetzt trinken" (Turn-Readiness-Ritual der App) |
 | `0x12 <Güte>` | Display zeigt Ergebnis-Rückmeldung: `0`=daneben, `1`=nah dran, `2`=Volltreffer |
-| `0x13` | Display zeigt "Ball fliegt"-Loop (Glas komplett von der Waage gehoben — App-seitige `useSipDetector`-"away"-Phase) |
+| `0x13 <gameId>` | Display zeigt spielspezifische "Glas ist weg"-Animation (Golf/Dart/Blackjack/Tower — Glas komplett von der Waage gehoben, App-seitige `useSipDetector`-"away"-Phase) |
+| `0x14 <gameId><r><g><b><nameLen><name>` | Zug gestartet: Namens-/Farb-Badge + Spiel-Icon oben auf dem Gewichtsscreen |
+| `0x15` | Zug beendet - Badge weg |
 
-`0x10`-`0x13` lösen keine eigene Gewichtslogik aus - die Waage kennt kein
-Spielkonzept, sie zeigt nur, was die App ihr sagt (siehe
-`TftDisplay::RemoteCue`). Aktuell nur Text/Farbe/einfache Formen als
-Platzhalter, echte Pixel-Art-Animationen sind der nächste Ausbauschritt
-(siehe Asset-Pipeline-Plan im `PRODUCT.md` der App).
+`gameId`: `0`=keins, `1`=Golf, `2`=Dart, `3`=Blackjack, `4`=Tower, `5`=Scale
+(siehe `GameKind` in `TftDisplay.h`). `0x10`-`0x15` lösen keine eigene
+Gewichtslogik aus - die Waage kennt kein Spielkonzept, sie zeigt nur, was
+die App ihr sagt (siehe `TftDisplay::RemoteCue`/`setActivePlayer()`). Die
+Away-/Ergebnis-Animationen sind rein prozedural (Linien/Kreise/Formen),
+nur die Bootanimation nutzt echte Pixel-Art-Sprites (siehe `data/boot/`).
 
 ## Bauen & Flashen
 
 ```
 pio run -e t-display-s3 -t upload      # ueber USB-C
 pio device monitor
+```
+
+Die Boot-Sprite-Frames (`data/boot/`) liegen auf einer eigenen SPIFFS-
+Partition (siehe `platformio.ini`, `board_build.filesystem = spiffs`) und
+werden vom normalen Firmware-Flash NICHT mit übertragen - nur nötig, wenn
+sich an `data/boot/` etwas ändert (nicht bei jedem Code-Flash):
+
+```
+pio run -e t-display-s3 -t uploadfs --upload-port <PORT>
 ```
 
 ## Firmware-Update per BLE (aus der App)
