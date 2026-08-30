@@ -9,7 +9,7 @@ fuer die Handy-Web-App (siehe Schwesterprojekt "Maßarbeit App"), TFT-Anzeige.
 Aktueller Stand: HX711-Handling + Kalibrierroutine + BLE-Gewichts-/Akkuservice
 (inkl. Fernsteuerung des Displays durch die App, siehe Abschnitt "BLE"
 weiter unten) + TFT-Anzeige mit Spieler-Badge und spielspezifischen
-Away-Animationen + Pixel-Art-Sprite-Bootanimation (siehe `data/boot/`) +
+Away-Animationen + Pixel-Art-Sprite-Bootanimation (siehe `data/`) +
 Taster-Bedienung + Deep-Sleep-Stromsparmodus + Firmware-Update direkt aus der
 App per BLE (kein WLAN am Partyort nötig, siehe Abschnitt "Firmware-Update
 per BLE" weiter unten) + Entwicklungs-OTA per WLAN. Die Away-/Ergebnis-
@@ -65,8 +65,8 @@ src/
   CalibrationRoutine.h/.cpp <- interaktive Kalibrierung ueber Serial+Taster
   OtaUpdater.h/.cpp        <- Firmware-Update per BLE (Chunks -> Update.h)
   DevOta.h/.cpp           <- WLAN + ArduinoOTA, nur fuer die Entwicklungsphase
-data/boot/
-  f000.raw … f049.raw     <- Boot-Sprite-Frames (SPIFFS, siehe data/boot/README.md)
+data/
+  f000.raw … f049.raw     <- Boot-Sprite-Frames (SPIFFS, siehe data/README.md)
   pal.raw                 <- gemeinsame 256-Farben-Palette dafuer
 firmware/
   manifest.json          <- Version + Groesse + MD5 der aktuellen Release-.bin
@@ -127,7 +127,7 @@ unten). Eine Write-Characteristic nimmt Kommandos entgegen:
 Gewichtslogik aus - die Waage kennt kein Spielkonzept, sie zeigt nur, was
 die App ihr sagt (siehe `TftDisplay::RemoteCue`/`setActivePlayer()`). Die
 Away-/Ergebnis-Animationen sind rein prozedural (Linien/Kreise/Formen),
-nur die Bootanimation nutzt echte Pixel-Art-Sprites (siehe `data/boot/`).
+nur die Bootanimation nutzt echte Pixel-Art-Sprites (siehe `data/`).
 
 ## Bauen & Flashen
 
@@ -136,10 +136,10 @@ pio run -e t-display-s3 -t upload      # ueber USB-C
 pio device monitor
 ```
 
-Die Boot-Sprite-Frames (`data/boot/`) liegen auf einer eigenen SPIFFS-
+Die Boot-Sprite-Frames (`data/`) liegen auf einer eigenen SPIFFS-
 Partition (siehe `platformio.ini`, `board_build.filesystem = spiffs`) und
 werden vom normalen Firmware-Flash NICHT mit übertragen - nur nötig, wenn
-sich an `data/boot/` etwas ändert (nicht bei jedem Code-Flash):
+sich an `data/` etwas ändert (nicht bei jedem Code-Flash):
 
 ```
 pio run -e t-display-s3 -t uploadfs --upload-port <PORT>
@@ -163,7 +163,7 @@ bisherige Firmware aktiv - die Waage kann durch ein fehlgeschlagenes
 Update nicht "gebrickt" werden.
 
 **Wichtig:** Ein App-BLE-Update überträgt nur die App-Partition, nie die
-SPIFFS-Partition (`data/boot/`, siehe unten). Ein Gerät, das per BLE von
+SPIFFS-Partition (`data/`, siehe unten). Ein Gerät, das per BLE von
 einer Firmware ohne Sprite-Bootanimation aktualisiert wird, bootet danach
 zwar sofort mit dem neuen Code, zeigt aber (bis einmal per USB + `pio run
 -t uploadfs` die Frames übertragen wurden) keine Bootanimation - fällt

@@ -150,7 +150,7 @@ void setup() {
     display.begin();
 
     // Kein Text-Zwischenscreen mehr davor ("Starte...") - die Sprite-
-    // Animation (data/boot/, siehe playBootSprite()) laeuft direkt los und
+    // Animation (data/, siehe playBootSprite()) laeuft direkt los und
     // erledigt die eigentliche Initialisierung (battery/buttons/scale/BLE,
     // siehe runNextBootStep() oben) parallel dazu, statt hinterher eine
     // feste Dauer draufzuschlagen.
