@@ -161,12 +161,28 @@ float Scale::getWeight() {
     // faelschlich weggetart. hx711.tare() statt Scale::tare(): wenige Samples,
     // kein Reset des Smart-Filter-Zustands/Log-Rauschens noetig - reine
     // Drift-Korrektur im Hintergrund.
-    if (currentFilterState == STABLE && fabsf(currentWeight) < AUTO_ZERO_BAND_G &&
+    bool nearZero = fabsf(currentWeight) < AUTO_ZERO_BAND_G;
+    if (currentFilterState == STABLE && nearZero &&
         now - lastAutoZeroMs > AUTO_ZERO_INTERVAL_MS) {
         hx711.tare(5);
         currentWeight = 0.0f;
         initializeSamples(0.0f);
         lastAutoZeroMs = now;
+    }
+
+    // Schock-Nullpunkt-Korrektur (siehe Scale.h) - greift unabhaengig vom
+    // Intervall oben, sobald sich ein eindeutig unmoeglicher NEGATIVER Wert
+    // eingependelt hat. Eigener, kurzer Ruhe-Check statt auf den vollen
+    // (langsamen) Smart-Filter-STABLE-Zustand zu warten - lastActivity wird
+    // von der Zustandsmaschine oben ohnehin schon bei jeder >4g-Aenderung
+    // aktualisiert, reicht direkt als Absicherung gegen das mechanische
+    // Nachschwingen.
+    if (!nearZero && currentWeight < NEGATIVE_DRIFT_THRESHOLD_G && now - lastActivity > NEGATIVE_DRIFT_SETTLE_MS) {
+        hx711.tare(5);
+        currentWeight = 0.0f;
+        initializeSamples(0.0f);
+        lastAutoZeroMs = now;
+        Serial.println("[Scale] Negativer Nullpunkt-Versatz erkannt, sofort korrigiert.");
     }
 
     return currentWeight;
