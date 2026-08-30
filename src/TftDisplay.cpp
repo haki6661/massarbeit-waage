@@ -219,6 +219,12 @@ void TftDisplay::playBootSprite(bool (*stepInit)()) {
     // fertig ist UND diese Mindestdauer erreicht ist.
     constexpr uint32_t MIN_VISIBLE_MS = 700;
 
+    // Fehlende Palette/Frames (z.B. nach einem BLE-Update von einer alten
+    // Firmware, die noch kein data/boot/ auf SPIFFS geschrieben hat - ein
+    // App-BLE-Update ueberträgt nur die App-Partition, nie die SPIFFS-
+    // Partition, siehe README "Firmware-Update per BLE") duerfen den Boot
+    // NICHT aufhalten - die Schleife unten faengt das pro Frame ab (leerer
+    // Screen statt Animation), stepInit() laeuft trotzdem normal durch.
     if (!SPIFFS.begin(true)) {
         Serial.println("[Boot] SPIFFS-Mount fehlgeschlagen - Sprite-Animation uebersprungen.");
         while (stepInit()) {

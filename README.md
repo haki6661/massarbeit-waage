@@ -162,6 +162,14 @@ nächsten Neustart auf die neue Partition um. Bricht die Übertragung ab
 bisherige Firmware aktiv - die Waage kann durch ein fehlgeschlagenes
 Update nicht "gebrickt" werden.
 
+**Wichtig:** Ein App-BLE-Update überträgt nur die App-Partition, nie die
+SPIFFS-Partition (`data/boot/`, siehe unten). Ein Gerät, das per BLE von
+einer Firmware ohne Sprite-Bootanimation aktualisiert wird, bootet danach
+zwar sofort mit dem neuen Code, zeigt aber (bis einmal per USB + `pio run
+-t uploadfs` die Frames übertragen wurden) keine Bootanimation - fällt
+sauber auf einen leeren Screen für die `MIN_VISIBLE_MS`-Mindestdauer zurück,
+kein Hänger.
+
 ### Release bauen
 
 1. `pio run -e t-display-s3` - baut `.pio/build/t-display-s3/firmware.bin`.
