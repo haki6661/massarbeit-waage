@@ -77,3 +77,32 @@ trinkt am schnellsten".
   spätere Statistik-Ansicht?
 
 **Status:** Nicht begonnen.
+
+## 4. Neuer Spielmodus: Eingießen statt Austrinken (Zielwert einschenken)
+
+**Idee:** Das Gegenteil der bisherigen Spiele (Golf/Dart/Blackjack/Tower
+zielen alle auf einen bestimmten Trink-/Abtrag-Wert ab, während das Glas
+von der Waage genommen wird). Hier bleibt das Glas die ganze Zeit auf der
+Waage stehen, und es muss ein vorgegebener Zielwert eingeschenkt/
+eingegossen werden - Ziel ist also ein bestimmtes Gewicht *hinzuzufügen*
+statt abzunehmen, möglichst genau getroffen.
+
+**Warum:** Andere Fähigkeit als die bisherigen Spiele (Eingießen mit
+Gefühl statt Trinken mit Gefühl), lässt sich z.B. auch nüchtern/ohne
+tatsächlichen Alkoholkonsum als reines Geschicklichkeitsspiel nutzen.
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Zielwert fix (z.B. "genau 40ml/g") oder pro Runde zufällig/von der App
+  vorgegeben, wie bei den bestehenden Spielen?
+- Da das Glas die ganze Zeit auf der Waage bleibt, gibt es keinen
+  "Away"-Zustand wie bei den anderen Spielen - wie sieht der Ablauf/die
+  Displayanzeige während des Eingießens stattdessen aus (z.B. Live-Balken
+  Richtung Zielwert)?
+- Wann gilt der Versuch als abgeschlossen - eigener Bestätigungs-Trigger
+  (Taste/App), oder automatisch, sobald der Wert eine Zeit lang stabil
+  bleibt (ähnlich der Stabilitätserkennung beim Eichen, siehe
+  `calibrationStore.ts` im App-Repo)?
+- Eigenes `GameKind` oder Sonderfall im bestehenden Katalog?
+
+**Status:** Nicht begonnen.
