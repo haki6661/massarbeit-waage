@@ -19,7 +19,7 @@ public:
 
     float getWeight();        // gefiltertes Gewicht, max. 1x/20ms neu berechnet
     float getCurrentWeight(); // letzter gefilterter Wert, ohne neue Messung
-    long  getRawValue();      // unkalibrierter Rohwert - fuer die Kalibrierroutine
+    long  getRawValue();      // unkalibrierter Rohwert (Mittel aus 10 Messungen) - fuer die Kalibrierroutine
 
     // Letzter unkalibrierter, ungefilterter Messwert aus getWeight() (in
     // "Gramm" bei aktuellem Kalibrierfaktor) - fuer die Debug-Anzeige, um

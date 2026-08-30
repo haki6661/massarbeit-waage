@@ -164,7 +164,12 @@ long Scale::getRawValue() {
     if (!isConnected) {
         return 0;
     }
-    return hx711.get_value(1);
+    // Mittel aus 10 Messungen statt nur einer einzelnen - der Rohwert
+    // schwankt im Ruhezustand um ca. +/-100-150 Counts (normales HX711-
+    // Rauschen), ein Einzelwert kann bei der Kalibrierroutine leicht ein
+    // Ausreisser sein und einen deutlich falschen (z.B. viel zu kleinen
+    // oder falsch vorzeichenbehafteten) Kalibrierfaktor erzeugen.
+    return hx711.get_value(10);
 }
 
 void Scale::initializeSamples(float initialValue) {
