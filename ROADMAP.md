@@ -36,33 +36,12 @@ jemand zuerst am Handy den Katalog öffnen muss.
 
 ## 2. Boot beschleunigen, kein "Starte..."-Text mehr
 
-**Idee:** Der Boot-Ablauf ist aktuell: `display.showMessage("Massarbeit
-Waage", "Starte...")` direkt nach `display.begin()`, dann HX711-Init,
-dann `playBootAnimation()` (~2,5s feste Balkenwaage-Sequenz + Boot-Checks).
-Der "Starte..."-Text soll weg — stattdessen soll die Balkenwaage-Animation
-selbst schon laufen, während im Hintergrund initialisiert wird (Endlos-
-Loop, keine feste Dauer), und erst wenn wirklich alles bereit ist,
-überblendet sie in den normalen Gewichtsscreen. Zusätzlich der gesamte
-Boot-Vorgang generell beschleunigen.
-
-**Warum:** "Starte..." als reiner Text ist unschön/unfertig wirkend,
-außerdem dauert der Boot aktuell spürbar (feste 2,5s Animation kommen on
-top zur eigentlichen Initialisierung).
-
-**Offene Fragen, noch nicht entschieden:**
-
-- `playBootAnimation()` ist aktuell blockierend mit fester Dauer
-  (`swingDurationMs`), läuft NACH der Initialisierung. Für eine echte
-  Hintergrund-Animation müsste die Balkenwaage-Schleife parallel zur
-  Initialisierung laufen (z.B. HX711-Init selbst non-blocking machen, oder
-  die Animation in kleinen Schritten zwischen den Init-Aufrufen weiter-
-  drehen) - im Zweifel mehr Umbau als nur der Text-Wegfall.
-- Wo genau lässt sich Zeit sparen? `Serial`-Warten auf USB (`while (!Serial
-  && millis() - waitStart < 3000)` in `main.cpp`) ist der größte bekannte
-  Posten - lohnt sich, das beim Batteriebetrieb (kein Serial Monitor dran)
-  zu überspringen statt die vollen 3s zu warten.
-- Sollen die Boot-Checks (HX711/Akku/BLE, aktuell Phase 2 der Animation)
-  trotzdem noch kurz sichtbar sein (z.B. nur bei einem Fehler), oder
-  komplett weg zugunsten von reiner Geschwindigkeit?
-
-**Status:** Nicht begonnen.
+**Status:** ✅ Erledigt. `TftDisplay::playBootSprite()` zeigt sofort die
+Pixel-Art-Sprite-Animation (`data/boot/`, siehe deren README) - kein
+Text-Screen mehr davor. Läuft parallel zur echten Initialisierung
+(`runNextBootStep()` in `main.cpp` erledigt battery/buttons/scale/BLE
+einen Schritt pro gezeigtem Frame) statt hinterher eine feste Dauer
+draufzuschlagen, plus die Serial-USB-Warteschleife von 3s auf 300ms
+verkürzt. Normaler Boot jetzt unter 2s statt vorher ~4-5s. Die Boot-Checks
+(HX711/Akku/BLE) sind als eigener Text-Screen komplett weg - nur bei
+tatsächlichem HX711-Fehler erscheint danach weiterhin eine Fehlermeldung.
