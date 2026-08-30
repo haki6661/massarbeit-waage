@@ -151,3 +151,22 @@ Result) geplant ist.
   übrigen Spieler müssen seinen Wert treffen.
 
 **Status:** Nicht begonnen.
+
+## 6. Neues Gehäuse für die Waage entwerfen und drucken
+
+**Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Waage, statt des
+aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
+`massarbeit_waage_base.stl`/`massarbeit_waage_platform.stl`).
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Was genau soll sich ändern - Optik/Formsprache, Material-/Druckbarkeit
+  (Stützstruktur, Druckzeit), Passgenauigkeit fürs T-Display-S3-Board,
+  oder auch neue Anforderungen (z.B. Aussparung fürs in der Chat-Recherche
+  diskutierte SD-Kartenmodul fürs Speicherproblem)?
+- Komplett neuer Entwurf oder Weiterentwicklung des bestehenden
+  `massarbeit_waage_case.scad`?
+- Bleibt es bei OpenSCAD (parametrisch, gut versionierbar als Textdatei)
+  als Werkzeug?
+
+**Status:** Nicht begonnen.
