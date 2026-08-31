@@ -47,6 +47,7 @@ enum class GameKind : uint8_t {
     Blackjack = 3,
     Tower = 4,
     Scale = 5,
+    Boxen = 6,
 };
 
 class TftDisplay {
@@ -163,4 +164,5 @@ private:
     void renderAwayDart();
     void renderAwayBlackjack();
     void renderAwayTower();
+    void renderAwayBoxen();
 };
