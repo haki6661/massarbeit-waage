@@ -8,7 +8,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.4.0"
+#define FIRMWARE_VERSION "1.4.1"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -78,7 +78,7 @@
 // die App entscheidet und schickt nur das Anzeige-Kommando.
 //
 // GameKind-Werte fuer <gameId> (0x13/0x14, siehe TftDisplay.h):
-//   0 = keins/generisch, 1 = Golf, 2 = Dart, 3 = Blackjack, 4 = Tower, 5 = Scale
+//   0 = keins/generisch, 1 = Golf, 2 = Dart, 3 = Blackjack, 4 = Tower, 5 = Scale, 6 = Boxen
 
 #define BLE_WEIGHT_NOTIFY_INTERVAL_MS 50 // 20x/s, wie im WeighMyBru2-Original
 #define BLE_BATTERY_NOTIFY_INTERVAL_MS 5000 // Akkustand aendert sich langsam - alle 5s reicht, spart Funkverkehr
