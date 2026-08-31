@@ -181,7 +181,30 @@ Rückmeldung direkt auf der Waage war ein nettes Sofort-Feedback, bevor man
 
 **Status:** Nicht begonnen.
 
-## 8. Neues Gehäuse für die Waage entwerfen und drucken
+## 8. Golf-"Grün" mit Pixel-Art-Texturen statt flachem Farbverlauf
+
+**Idee:** Das neue Golf-Grün in der App (siehe massarbeit-app PR #20-#25 -
+Ball+Fahne statt Tacho, eigene Pixelart-Fahnen-Sprite-Animation) nutzt aktuell
+nur einen flachen Farbverlauf als Untergrund. Passend zur bereits gewählten
+Pixel-Art-Fahne soll die ganze Grün-Fläche selbst auch strukturiertes
+Pixel-Art-Terrain bekommen (z.B. Gras-/Fairway-Textur, evtl. mit leichtem
+Rasenmuster-Streifen wie bei echten Golfplätzen).
+
+**Warum:** Konsistenter visueller Stil - aktuell wirkt die Fahne (Pixel-Art)
+und der Untergrund (glatter CSS-Gradient) stilistisch nicht zusammengehörig.
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Als Tile-Textur (kleines wiederholtes Pixel-Art-Muster, per CSS
+  `background-image`/`background-repeat`) oder als volles, einmalig
+  gezeichnetes Hintergrundbild pro Zeile?
+- Selbst gezeichnet (wie die Fahne) oder ebenfalls vom Nutzer geliefert?
+- Bewegt sich die Textur mit (Parallax/Scroll-Effekt bei Ball-/Fahnen-
+  Bewegung) oder bleibt sie starr?
+
+**Status:** Nicht begonnen.
+
+## 9. Neues Gehäuse für die Waage entwerfen und drucken
 
 **Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Waage, statt des
 aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
