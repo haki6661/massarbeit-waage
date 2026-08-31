@@ -23,6 +23,22 @@ namespace {
         { GameKind::Scale, "Scale" },
     };
     constexpr uint8_t PICKER_GAME_COUNT = sizeof(PICKER_GAMES) / sizeof(PICKER_GAMES[0]);
+
+    // Feste Anzeigedauer je Sprite-Frame (siehe playBootSprite()) - macht die
+    // Abspielgeschwindigkeit unabhaengig davon, wie lange SPIFFS-Lesen +
+    // Zeichnen + stepInit() in diesem konkreten Frame gebraucht haben (das
+    // schwankt spuerbar, u.a. je nachdem ob gerade ein init-Schritt wie
+    // bleService.begin() im selben Frame mitlief). 100ms = die Framerate des
+    // Quell-GIFs (10fps, siehe BOOT_SPRITE_ASSETS.md) - jeder gezeigte Frame
+    // ersetzt ja 3 Original-Frames (STEP=3), laeuft aber weiter in Original-
+    // Geschwindigkeit statt gerafft. Gilt bewusst als eigene, benannte
+    // Konstante (nicht direkt in playBootSprite() vergraben): weitere
+    // Sprite-Animationen sind geplant (spaeter von SD statt SPIFFS geladen,
+    // siehe ROADMAP.md) - eine davon abweichende Zieldauer laesst sich dann
+    // pro Animation einfach als eigene Konstante danebenstellen, das
+    // Pacing-Muster selbst (Frame-Start merken, Restzeit am Ende abwarten)
+    // bleibt 1:1 wiederverwendbar.
+    constexpr uint16_t SPRITE_FRAME_DURATION_MS = 100;
 }
 
 void TftDisplay::begin() {
@@ -307,6 +323,8 @@ void TftDisplay::playBootSprite(bool (*stepInit)()) {
     bool loggedMissingFrame = false;
 
     while (true) {
+        uint32_t frameStartMs = millis();
+
         char path[16];
         snprintf(path, sizeof(path), "/f%03u.raw", frameIndex);
         File frameFile = SPIFFS.open(path, "r");
@@ -339,6 +357,17 @@ void TftDisplay::playBootSprite(bool (*stepInit)()) {
         // (Endlosschleife), bis auch das fertig ist.
         if (initDone && framesShown >= FRAME_COUNT) {
             break;
+        }
+
+        // Restzeit bis zur festen Frame-Dauer abwarten - SPIFFS-Lesen +
+        // Zeichnen + stepInit() brauchen pro Frame unterschiedlich lange
+        // (deshalb "mal schneller, mal langsamer"). Dauert ein Frame
+        // ausnahmsweise laenger als das Budget (z.B. ein besonders teurer
+        // init-Schritt), einfach ohne Wartezeit weiter - aufholen bringt
+        // nichts, wuerde die Animation nur ruckeln lassen.
+        uint32_t elapsedMs = millis() - frameStartMs;
+        if (elapsedMs < SPRITE_FRAME_DURATION_MS) {
+            delay(SPRITE_FRAME_DURATION_MS - elapsedMs);
         }
     }
 
