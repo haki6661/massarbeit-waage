@@ -105,8 +105,18 @@ void TftDisplay::update(bool hx711Connected, bool bleConnected) {
 
     bool bleChanged = (bleConnected != lastBleConnected_);
     lastBleConnected_ = bleConnected;
+    bool hx711Changed = (hx711Connected != lastHx711Connected_);
+    lastHx711Connected_ = hx711Connected;
 
-    if (!bleChanged && !forceRedraw_ && (now - lastRenderMs_ < 150)) {
+    // Anders als beim frueheren Live-Gewicht (das sich fast jeden Tick
+    // aenderte, siehe altes fullRedraw-Kommentar) laeuft in keinem der
+    // Ruhezustaende (Spielauswahl/Bestaetigt/Warteschirm) irgendeine
+    // laufende Animation - ohne aenderungsbasierte Bedingung wuerde hier
+    // trotzdem alle ~150ms ein kompletter fillScreen(BLACK) samt Neuzeichnen
+    // passieren, obwohl sich nichts geaendert hat (sichtbarer Schwarz-Blitz,
+    // "Flackern"). Nur noch bei einer TATSAECHLICHEN Aenderung neu zeichnen,
+    // kein periodischer Zwangs-Redraw mehr.
+    if (!bleChanged && !hx711Changed && !forceRedraw_) {
         return;
     }
 
