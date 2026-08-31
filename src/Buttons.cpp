@@ -18,7 +18,7 @@ void Buttons::update() {
     button2_.tick();
 }
 
-void Buttons::onTare(void (*callback)()) {
+void Buttons::onButton1Click(void (*callback)()) {
     button1_.attachClick(callback);
 }
 
@@ -26,7 +26,7 @@ void Buttons::onSleepLongPress(void (*callback)()) {
     button1_.attachLongPressStart(callback);
 }
 
-void Buttons::onModeClick(void (*callback)()) {
+void Buttons::onButton2Click(void (*callback)()) {
     button2_.attachClick(callback);
 }
 

@@ -11,13 +11,18 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 
-enum class DisplayMode {
-    Weight,
-    Status,
+// Lokaler Anzeige-Zustand, wenn WEDER ein RemoteCue laeuft NOCH ein Spieler
+// am Zug ist (siehe hasActivePlayer_) - die Waage ist "zwischen Spielen".
+// Ersetzt die bisherige reine Live-Gewichtsanzeige (war nur zum Debuggen
+// gedacht, siehe ROADMAP.md Punkt 1) durch die Geraete-Spielauswahl: Taste 1
+// kurz schaltet durch die Spieleliste, Taste 2 kurz bestaetigt.
+enum class LocalScreen {
+    GamePicker,     // "<Icon> <Name>", Taste 1/2-Hinweis
+    GameConfirmed,  // "<Name> ausgewaehlt - jetzt in der App oeffnen"
 };
 
 // Von der App per BLE ferngesteuerte Anzeige-Hinweise (siehe Config.h fuer
-// das Kommando-Protokoll) - ueberlagern DisplayMode voruebergehend, z.B.
+// das Kommando-Protokoll) - ueberlagern LocalScreen voruebergehend, z.B.
 // waehrend des Turn-Readiness-Rituals eines Spiels. Grundgeruest: aktuell
 // nur Text/Farbe je Zustand, spaeter geplant sind echte Animationen
 // (Abschlag-Animation, unterschiedliche Animation je Ergebnis-Guete).
@@ -50,11 +55,27 @@ public:
 
     // In loop() aufrufen. Zeichnet intern gedrosselt (~alle 150ms) neu, um
     // nicht bei jedem Loop-Durchlauf den ganzen Bildschirm neu zu fuellen.
-    // rawReading: letzter unkalibrierter Messwert (Scale::getLastRawReading())
-    // - reine Debug-Info, um ohne Kalibrierung zu sehen, dass sich die
-    // Waegezelle ueberhaupt aendert.
-    void update(DisplayMode mode, float weight, float rawReading, bool hx711Connected,
-                bool bleConnected, float batteryVoltage);
+    // Zeigt je nach Zustand: RemoteCue (laueft ein Spiel-Ritual) > Spieler-
+    // Warteschirm (Spieler am Zug, aber gerade kein Cue) > Geraete-
+    // Spielauswahl (Ruhezustand) - siehe LocalScreen. Kein Live-Gewicht
+    // mehr auf dem Display (war nur Debug-Hilfsmittel, siehe ROADMAP.md
+    // Punkt 1) - fuer den seltenen Fall, dass der Rohwert doch mal
+    // gebraucht wird, bleibt er ueber Serial (main.cpp) einsehbar.
+    void update(bool hx711Connected, bool bleConnected);
+
+    // Von main.cpp bei Taste 1 kurz (Geraete-Spielauswahl) aufgerufen -
+    // schaltet zur naechsten Spiel-Option durch bzw. oeffnet die Auswahl
+    // erneut, falls gerade GameConfirmed angezeigt wird. Ohne Wirkung,
+    // waehrend ein RemoteCue/Spieler-Zug laeuft (Taste 1 waere sonst
+    // waehrend eines echten Spiels missverstaendlich belegt).
+    void pickerNext();
+
+    // Von main.cpp bei Taste 2 kurz aufgerufen - bestaetigt die aktuell
+    // hervorgehobene Auswahl (zeigt "X ausgewaehlt - jetzt in der App
+    // oeffnen"). Kein automatisches Umschalten der App (siehe ROADMAP.md
+    // Punkt 1, "App-Sync" bewusst fuers Erste zurueckgestellt) - reine
+    // lokale Anzeige, die Bestaetigung in der App passiert weiter von Hand.
+    void pickerConfirm();
 
     // Sofortiger, vollflaechiger Text-Screen - fuer Start- und
     // Kalibrierungs-Prompts, unabhaengig vom Drossel-Timer von update().
@@ -84,8 +105,8 @@ public:
     void setRemoteCue(RemoteCue cue, GameKind game = GameKind::None);
 
     // Von BleWeightService bei einem 0x14/0x15-Kommando aufgerufen: zeigt
-    // ein kleines Namens-/Farb-Badge (+ Spiel-Icon) oben auf dem normalen
-    // Gewichtsscreen, solange ein Spieler am Zug ist - siehe
+    // ein kleines Namens-/Farb-Badge (+ Spiel-Icon) auf dem Warteschirm
+    // (renderWaitingForTurnScreen()), solange ein Spieler am Zug ist - siehe
     // renderPlayerBadge() in TftDisplay.cpp. `name` wird auf ca. 10 Zeichen
     // gekuerzt (mehr passt auf dem 320x170-Display ohnehin nicht lesbar hin).
     void setActivePlayer(GameKind game, uint16_t color565, const String& name);
@@ -109,7 +130,6 @@ private:
     uint16_t creamColor_ = 0;
     uint16_t coralColor_ = 0;
 
-    DisplayMode lastMode_ = DisplayMode::Weight;
     uint32_t lastRenderMs_ = 0;
     bool forceRedraw_ = true;
     bool lastBleConnected_ = false;
@@ -123,8 +143,17 @@ private:
     uint16_t activePlayerColor565_ = 0;
     String activePlayerName_;
 
-    void renderWeightScreen(float weight, bool hx711Connected, bool bleConnected, bool fullRedraw);
-    void renderStatusScreen(float rawReading, bool hx711Connected, bool bleConnected, float batteryVoltage);
+    // Geraete-Spielauswahl (siehe pickerNext()/pickerConfirm()) - Index in
+    // PICKER_GAMES (TftDisplay.cpp), Reihenfolge/Namen bewusst 1:1 synchron
+    // zu GAME_REGISTRY in gameRegistry.ts (App-Repo) gepflegt statt per BLE
+    // uebertragen (siehe ROADMAP.md Punkt 1, "App-Sync" zurueckgestellt).
+    LocalScreen localScreen_ = LocalScreen::GamePicker;
+    uint8_t pickerIndex_ = 0;
+
+    void renderGamePickerScreen(bool hx711Connected, bool bleConnected);
+    void renderGameConfirmedScreen(bool hx711Connected, bool bleConnected);
+    void renderWaitingForTurnScreen(bool hx711Connected, bool bleConnected);
+    void renderIdleFooter(bool hx711Connected, bool bleConnected);
     void renderRemoteCueScreen(RemoteCue cue);
     void renderPlayerBadge(int16_t x, int16_t y);
     void renderGameIcon(GameKind game, int16_t cx, int16_t cy, int16_t size, uint16_t color);

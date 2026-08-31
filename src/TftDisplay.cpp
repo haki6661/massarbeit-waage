@@ -5,6 +5,24 @@
 
 namespace {
     constexpr uint16_t COLOR_MUTED = 0x7BEF; // grau
+
+    // Geraete-Spielauswahl (siehe TftDisplay::pickerNext()) - Reihenfolge +
+    // Namen bewusst 1:1 zu GAME_REGISTRY in gameRegistry.ts (App-Repo)
+    // gepflegt. Manuell synchron halten statt per BLE zu uebertragen (siehe
+    // ROADMAP.md Punkt 1) - haelt den ersten Wurf einfach, auf Kosten davon,
+    // dass ein neues Spiel im App-Repo hier von Hand nachgezogen werden muss.
+    struct PickerGame {
+        GameKind kind;
+        const char* name;
+    };
+    constexpr PickerGame PICKER_GAMES[] = {
+        { GameKind::Golf, "Golf" },
+        { GameKind::Dart, "Dart" },
+        { GameKind::Blackjack, "Blackjack" },
+        { GameKind::Tower, "Wackelturm" },
+        { GameKind::Scale, "Scale" },
+    };
+    constexpr uint8_t PICKER_GAME_COUNT = sizeof(PICKER_GAMES) / sizeof(PICKER_GAMES[0]);
 }
 
 void TftDisplay::begin() {
@@ -62,8 +80,7 @@ namespace {
     }
 }
 
-void TftDisplay::update(DisplayMode mode, float weight, float rawReading, bool hx711Connected,
-                         bool bleConnected, float batteryVoltage) {
+void TftDisplay::update(bool hx711Connected, bool bleConnected) {
     uint32_t now = millis();
 
     if (remoteCue_ != RemoteCue::None) {
@@ -76,6 +93,7 @@ void TftDisplay::update(DisplayMode mode, float weight, float rawReading, bool h
         uint32_t timeoutMs = isLongLived ? 20000 : 4000;
         if (now - remoteCueSetMs_ > timeoutMs) {
             remoteCue_ = RemoteCue::None;
+            forceRedraw_ = true;
         } else {
             if (!forceRedraw_ && (now - lastRenderMs_ < 150)) return;
             lastRenderMs_ = now;
@@ -85,128 +103,145 @@ void TftDisplay::update(DisplayMode mode, float weight, float rawReading, bool h
         }
     }
 
-    bool modeChanged = (mode != lastMode_);
     bool bleChanged = (bleConnected != lastBleConnected_);
     lastBleConnected_ = bleConnected;
 
-    if (!modeChanged && !bleChanged && !forceRedraw_ && (now - lastRenderMs_ < 150)) {
+    if (!bleChanged && !forceRedraw_ && (now - lastRenderMs_ < 150)) {
         return;
     }
 
-    // Voller Redraw (fillScreen + alle Elemente inkl. Titel/Badge/Fusszeile)
-    // nur, wenn sich etwas Strukturelles geaendert hat (Modus-Wechsel,
-    // BLE-Verbindungsstatus, oder ein explizites forceRedraw_ z.B. durch
-    // setActivePlayer()) - sonst nur die Gewichtszahl selbst neu zeichnen.
-    // Grund: bei ~150ms-Refresh und einer (vor der Kalibrierung besonders)
-    // stark schwankenden Zahl sah das volle fillScreen()-Blinken bei jedem
-    // Tick wie starkes Flackern aus, obwohl Titel/Badge/Fusszeile sich gar
-    // nicht aendern.
-    bool fullRedraw = modeChanged || bleChanged || forceRedraw_;
-
     lastRenderMs_ = now;
-    lastMode_ = mode;
     forceRedraw_ = false;
 
-    switch (mode) {
-        case DisplayMode::Weight:
-            renderWeightScreen(weight, hx711Connected, bleConnected, fullRedraw);
-            break;
-        case DisplayMode::Status:
-            renderStatusScreen(rawReading, hx711Connected, bleConnected, batteryVoltage);
-            break;
+    // Prioritaet: Spieler-Warteschirm (ein Zug ist gerade aktiv, aber
+    // zwischen zwei RemoteCues) > Geraete-Spielauswahl (Ruhezustand).
+    if (hasActivePlayer_) {
+        renderWaitingForTurnScreen(hx711Connected, bleConnected);
+    } else if (localScreen_ == LocalScreen::GameConfirmed) {
+        renderGameConfirmedScreen(hx711Connected, bleConnected);
+    } else {
+        renderGamePickerScreen(hx711Connected, bleConnected);
     }
 }
 
-void TftDisplay::renderWeightScreen(float weight, bool hx711Connected, bool bleConnected, bool fullRedraw) {
-    if (fullRedraw) {
-        gfx_->fillScreen(BLACK);
+void TftDisplay::pickerNext() {
+    // Waehrend eines echten Spiels (RemoteCue laeuft oder ein Spieler ist am
+    // Zug) absichtlich ohne Wirkung - Taste 1 waere sonst waehrend eines
+    // laufenden Spiels doppeldeutig belegt.
+    if (remoteCue_ != RemoteCue::None || hasActivePlayer_) return;
+    pickerIndex_ = (pickerIndex_ + 1) % PICKER_GAME_COUNT;
+    localScreen_ = LocalScreen::GamePicker;
+    forceRedraw_ = true;
+}
 
-        // Kopfzeile: Spieler-Badge (Name/Farbe/Spiel-Icon), solange jemand
-        // am Zug ist (siehe setActivePlayer()), sonst der schlichte Titel.
-        if (hasActivePlayer_) {
-            renderPlayerBadge(6, 5);
-        } else {
-            gfx_->setTextColor(WHITE);
-            gfx_->setTextSize(2);
-            gfx_->setCursor(8, 8);
-            gfx_->print("Massarbeit Waage");
-        }
+void TftDisplay::pickerConfirm() {
+    if (remoteCue_ != RemoteCue::None || hasActivePlayer_) return;
+    localScreen_ = LocalScreen::GameConfirmed;
+    forceRedraw_ = true;
+}
 
-        gfx_->setTextColor(COLOR_MUTED);
+// Kleiner BLE-Verbindungspunkt oben rechts - bewusst in ALLEN drei
+// Ruhezustands-Screens an derselben Stelle, statt wie frueher als eigene
+// Fusszeile (die je nach Screen unterschiedlich viel Platz brauchte).
+void TftDisplay::renderIdleFooter(bool hx711Connected, bool bleConnected) {
+    (void)hx711Connected; // HX711-Fehler wird vorher schon als eigener Screen abgefangen
+    uint16_t bleColor = bleConnected ? zestColor_ : COLOR_MUTED;
+    gfx_->fillCircle(307, 13, 4, bleColor);
+}
+
+void TftDisplay::renderGamePickerScreen(bool hx711Connected, bool bleConnected) {
+    gfx_->fillScreen(BLACK);
+
+    if (!hx711Connected) {
+        gfx_->setTextColor(coralColor_);
+        gfx_->setTextSize(2);
+        gfx_->setCursor(8, 60);
+        gfx_->print("HX711 Fehler");
         gfx_->setTextSize(1);
-        gfx_->setCursor(8, 152);
-        gfx_->print("Taste1: Tara   Taste2: Status");
-    } else {
-        // Nur den dynamischen Bereich (Gewichtszahl + BLE-Status) loeschen
-        // und neu zeichnen statt den kompletten Screen - deutlich weniger
-        // sichtbares Flackern, Titel/Badge/Fusszeile bleiben unberuehrt.
-        gfx_->fillRect(4, 58, 300, 44, BLACK);
-        gfx_->fillRect(4, 118, 300, 14, BLACK);
+        gfx_->setTextColor(COLOR_MUTED);
+        gfx_->setCursor(8, 90);
+        gfx_->print("Verkabelung pruefen");
+        return;
     }
 
-    gfx_->setTextSize(4);
-    gfx_->setCursor(8, 62);
+    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->setTextSize(1);
+    gfx_->setCursor(8, 12);
+    gfx_->print("Spiel waehlen");
+
+    const PickerGame& game = PICKER_GAMES[pickerIndex_];
+    renderGameIcon(game.kind, 160, 62, 42, zestColor_);
+
+    int16_t x1, y1;
+    uint16_t w, h;
+    gfx_->setTextSize(3);
+    gfx_->setTextColor(WHITE);
+    gfx_->getTextBounds(game.name, 0, 0, &x1, &y1, &w, &h);
+    gfx_->setCursor((320 - w) / 2, 98);
+    gfx_->print(game.name);
+
+    char posBuf[8];
+    snprintf(posBuf, sizeof(posBuf), "%u / %u", pickerIndex_ + 1, PICKER_GAME_COUNT);
+    gfx_->setTextSize(1);
+    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->getTextBounds(posBuf, 0, 0, &x1, &y1, &w, &h);
+    gfx_->setCursor((320 - w) / 2, 128);
+    gfx_->print(posBuf);
+
+    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->setCursor(8, 152);
+    gfx_->print("Taste1: wechseln   Taste2: waehlen");
+
+    renderIdleFooter(hx711Connected, bleConnected);
+}
+
+void TftDisplay::renderGameConfirmedScreen(bool hx711Connected, bool bleConnected) {
+    gfx_->fillScreen(BLACK);
+    const PickerGame& game = PICKER_GAMES[pickerIndex_];
+
+    renderGameIcon(game.kind, 160, 52, 36, zestColor_);
+
+    int16_t x1, y1;
+    uint16_t w, h;
+    gfx_->setTextSize(3);
+    gfx_->setTextColor(zestColor_);
+    gfx_->getTextBounds(game.name, 0, 0, &x1, &y1, &w, &h);
+    gfx_->setCursor((320 - w) / 2, 88);
+    gfx_->print(game.name);
+
+    const char* hint = "In der App oeffnen";
+    gfx_->setTextSize(1);
+    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->getTextBounds(hint, 0, 0, &x1, &y1, &w, &h);
+    gfx_->setCursor((320 - w) / 2, 122);
+    gfx_->print(hint);
+
+    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->setCursor(8, 152);
+    gfx_->print("Taste1: anderes Spiel");
+
+    renderIdleFooter(hx711Connected, bleConnected);
+}
+
+// Zwischenzustand: ein Spieler ist am Zug (siehe setActivePlayer()), aber
+// gerade laeuft kein RemoteCue (z.B. kurz zwischen zwei Rituale-Schritten).
+// Kein Live-Gewicht mehr (siehe ROADMAP.md Punkt 1) - nur noch das Badge
+// plus ein schlichter Warte-Hinweis.
+void TftDisplay::renderWaitingForTurnScreen(bool hx711Connected, bool bleConnected) {
+    gfx_->fillScreen(BLACK);
+    renderPlayerBadge(6, 5);
+
+    gfx_->setTextSize(2);
+    gfx_->setCursor(8, 70);
     if (!hx711Connected) {
         gfx_->setTextColor(coralColor_);
         gfx_->print("HX711 Fehler");
     } else {
-        gfx_->setTextColor(zestColor_);
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%.1f g", weight);
-        gfx_->print(buf);
+        gfx_->setTextColor(COLOR_MUTED);
+        gfx_->print("Bereit ...");
     }
 
-    // Kleines BLE-Statuslicht statt eigener Textzeile - macht oben Platz
-    // fuers Spieler-Badge, ohne dass der Verbindungsstatus ganz verschwindet.
-    // Rohwert-Debug ist auf den Status-Screen (Taste 2 kurz) umgezogen.
-    uint16_t bleColor = bleConnected ? zestColor_ : COLOR_MUTED;
-    gfx_->fillCircle(13, 128, 4, bleColor);
-    gfx_->setTextSize(1);
-    gfx_->setTextColor(bleColor);
-    gfx_->setCursor(24, 124);
-    gfx_->print(bleConnected ? "Verbunden" : "Wartet auf Verbindung ...");
-}
-
-void TftDisplay::renderStatusScreen(float rawReading, bool hx711Connected, bool bleConnected, float batteryVoltage) {
-    gfx_->fillScreen(BLACK);
-
-    gfx_->setTextColor(WHITE);
-    gfx_->setTextSize(2);
-    gfx_->setCursor(8, 8);
-    gfx_->print("Status");
-
-    gfx_->setTextSize(1);
-    gfx_->setCursor(8, 45);
-    gfx_->setTextColor(hx711Connected ? GREEN : RED);
-    gfx_->print(hx711Connected ? "HX711: OK" : "HX711: FEHLER");
-
-    gfx_->setCursor(8, 60);
-    gfx_->setTextColor(COLOR_MUTED);
-    if (hx711Connected) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "Rohwert: %.0f", rawReading);
-        gfx_->print(buf);
-    } else {
-        gfx_->print("Rohwert: -- (DT/SCK/VCC pruefen)");
-    }
-
-    gfx_->setCursor(8, 80);
-    gfx_->setTextColor(bleConnected ? GREEN : YELLOW);
-    gfx_->print(bleConnected ? "BLE: verbunden" : "BLE: wartet auf Verbindung");
-
-    gfx_->setCursor(8, 100);
-    gfx_->setTextColor(WHITE);
-    if (batteryVoltage > 0.1f) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "Akku: %.2f V", batteryVoltage);
-        gfx_->print(buf);
-    } else {
-        gfx_->print("Akku: n/a (USB gesteckt)");
-    }
-
-    gfx_->setTextColor(COLOR_MUTED);
-    gfx_->setCursor(8, 152);
-    gfx_->print("Taste2: zurueck zur Waage");
+    renderIdleFooter(hx711Connected, bleConnected);
 }
 
 void TftDisplay::playBootSprite(bool (*stepInit)()) {

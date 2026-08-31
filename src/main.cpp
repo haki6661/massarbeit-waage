@@ -20,7 +20,6 @@ Buttons buttons;
 CalibrationRoutine calibration(scale, display);
 DevOta devOta;
 
-DisplayMode currentMode = DisplayMode::Weight;
 bool calibrationRequested = false;
 bool sleepRequested = false;
 bool devOtaActive = false;
@@ -38,16 +37,19 @@ unsigned long lastActivityMs = 0;
 float lastActivityWeight = 0.0f;
 bool activityBaselineSet = false;
 
-void onTareClick() {
-    Serial.println("[Button] Taste 1: Tare");
-    scale.tare();
+// Taste 1 kurz: Geraete-Spielauswahl, naechste Option (siehe ROADMAP.md
+// Punkt 1). Tara gibt es als eigene Tastenfunktion nicht mehr - laeuft nur
+// noch automatisch (Auto-Zero-Nachfuehrung, siehe Scale.cpp) oder ueber die
+// App (BLE-Kommando 0x01).
+void onButton1Click() {
+    display.pickerNext();
     lastActivityMs = millis();
 }
 
-void onModeClick() {
-    currentMode = (currentMode == DisplayMode::Weight) ? DisplayMode::Status : DisplayMode::Weight;
-    Serial.printf("[Button] Taste 2: Modus -> %s\n",
-                  currentMode == DisplayMode::Weight ? "Gewicht" : "Status");
+// Taste 2 kurz: Geraete-Spielauswahl bestaetigen. Rein lokale Anzeige, kein
+// automatisches Umschalten der App (siehe ROADMAP.md Punkt 1).
+void onButton2Click() {
+    display.pickerConfirm();
     lastActivityMs = millis();
 }
 
@@ -96,9 +98,9 @@ bool runNextBootStep() {
             return true;
         case 1:
             buttons.begin();
-            buttons.onTare(onTareClick);
+            buttons.onButton1Click(onButton1Click);
             buttons.onSleepLongPress(onSleepLongPress);
-            buttons.onModeClick(onModeClick);
+            buttons.onButton2Click(onButton2Click);
             buttons.onCalibrationLongPress(onCalibrationLongPress);
             return true;
         case 2:
@@ -172,8 +174,8 @@ void setup() {
     }
 
     Serial.println("[Setup] Bereit.");
-    Serial.println("Taste 1: Tara (kurz) / Deep Sleep (2s halten)");
-    Serial.println("Taste 2: Status-Anzeige (kurz) / Kalibrierung (lang halten)");
+    Serial.println("Taste 1: Spielauswahl weiter (kurz) / Deep Sleep (2s halten)");
+    Serial.println("Taste 2: Spielauswahl bestaetigen (kurz) / Kalibrierung (lang halten)");
     Serial.printf("[Power] Auto-Sleep nach %lu Minuten Inaktivitaet.\n", AUTO_SLEEP_TIMEOUT_MS / 60000UL);
 
     lastActivityMs = millis();
@@ -213,8 +215,7 @@ void loop() {
         calibration.run();
     }
 
-    display.update(currentMode, weight, scale.getLastRawReading(), scale.isHX711Connected(),
-                    bleService.isConnected(), battery.readVoltage());
+    display.update(scale.isHX711Connected(), bleService.isConnected());
 
     delay(5);
 }
