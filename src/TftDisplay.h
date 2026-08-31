@@ -133,6 +133,7 @@ private:
     uint32_t lastRenderMs_ = 0;
     bool forceRedraw_ = true;
     bool lastBleConnected_ = false;
+    bool lastHx711Connected_ = true;
 
     RemoteCue remoteCue_ = RemoteCue::None;
     GameKind remoteCueGame_ = GameKind::None; // nur fuer RemoteCue::Away relevant
