@@ -6,33 +6,25 @@ größere, noch nicht im Detail durchdachte Vorhaben.
 
 ## 1. Taste 1 kurz: Tara raus, stattdessen Spiel-Schnellauswahl
 
-**Idee:** Taste 1 (kurz) tariert aktuell direkt. Stattdessen soll Taste 1
-(kurz) durch eine Liste von Spielen durchschalten (ohne Spielernamen, nur
-das Spiel selbst — reine Geräte-Vorauswahl), Taste 2 (kurz) bestätigt die
-Auswahl. Tara fällt als direkte Taste-1-Funktion weg.
+**Status:** ✅ Groesstenteils erledigt (Firmware 1.4.0). Taste 1 kurz schaltet
+durch die Spieleliste (`PICKER_GAMES` in `TftDisplay.cpp`), Taste 2 kurz
+bestaetigt ("X ausgewaehlt - jetzt in der App oeffnen"). Tara ist als eigene
+Tastenfunktion ersatzlos weg - laeuft nur noch automatisch (Auto-Zero-
+Nachfuehrung) oder ueber die App (BLE-Kommando 0x01). Deep Sleep unveraendert
+auf Taste 1 lang. Im Zuge dessen gleich die gesamte Live-Gewichtsanzeige
+(bisheriger `DisplayMode::Weight`/`Status`) durch Spielzustands-Anzeigen
+ersetzt (siehe unten, "generell Display").
 
-**Warum:** Die Waage soll ein Spiel starten können, ohne dass zwingend
-jemand zuerst am Handy den Katalog öffnen muss.
-
-**Offene Fragen, noch nicht entschieden:**
-
-- Woher kennt die Firmware die Spieleliste? Fest im Code hinterlegen
-  (Name + `GameKind`, siehe `TftDisplay.h`) und mit `src/lib/gameRegistry.ts`
-  im App-Repo synchron halten, oder von der App per BLE übertragen lassen
-  (aufwendiger, aber immer aktuell)?
-- Was passiert mit Tara, wenn es nicht mehr auf Taste 1 kurz liegt? Ganz
-  weg (App übernimmt Tara komplett über den bestehenden BLE-Befehl `0x01`),
-  oder auf eine andere Taste/Geste verlegen (z.B. Taste 1 lang, das aktuell
-  Deep Sleep ist — dann bräuchte Deep Sleep eine neue Taste)?
-- Wie wirkt sich die Auswahl aus, wenn die App bereits verbunden ist und
-  über sie ein Spiel läuft — gewinnt die App-Auswahl, oder synchronisieren
-  sich beide (z.B. Geräte-Auswahl sendet einen neuen BLE-Befehl, der die
-  App auffordert, direkt in dieses Spiel zu wechseln)?
-- UI auf dem Display: eigener Screen mit Spielname + kleinem Icon
-  (`renderGameIcon()` existiert bereits für die Spieler-Badges, ließe sich
-  wiederverwenden), Fortschritt/Auswahl-Indikator beim Durchschalten.
-
-**Status:** Nicht begonnen.
+**Bewusst zurueckgestellt:**
+- Spieleliste ist fest im Firmware-Code hinterlegt, manuell synchron zu
+  `GAME_REGISTRY` in `gameRegistry.ts` (App-Repo) gepflegt - kein
+  automatischer/BLE-basierter Sync. Neues Spiel im App-Repo = `PICKER_GAMES`
+  von Hand nachziehen.
+- Kein automatisches Umschalten der App bei einer Geraete-Auswahl (App-Sync)
+  - die Bestaetigung/der eigentliche Spielstart passiert weiter von Hand in
+  der App. Waere ein groesserer Zusatzschritt (neue BLE-Notify-Richtung
+  Geraet->App + App-seitiger Listener) und ist eine eigene, noch nicht
+  angegangene Ausbaustufe.
 
 ## 2. Boot beschleunigen, kein "Starte..."-Text mehr
 
