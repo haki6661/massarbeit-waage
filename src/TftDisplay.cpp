@@ -20,6 +20,7 @@ namespace {
         { GameKind::Dart, "Dart" },
         { GameKind::Blackjack, "Blackjack" },
         { GameKind::Tower, "Wackelturm" },
+        { GameKind::Boxen, "Boxen" },
         { GameKind::Scale, "Scale" },
     };
     constexpr uint8_t PICKER_GAME_COUNT = sizeof(PICKER_GAMES) / sizeof(PICKER_GAMES[0]);
@@ -406,6 +407,9 @@ void TftDisplay::renderRemoteCueScreen(RemoteCue cue) {
             case GameKind::Tower:
                 renderAwayTower();
                 break;
+            case GameKind::Boxen:
+                renderAwayBoxen();
+                break;
             case GameKind::Golf:
             case GameKind::Scale:
             case GameKind::None:
@@ -578,6 +582,10 @@ void TftDisplay::renderGameIcon(GameKind game, int16_t cx, int16_t cy, int16_t s
             }
             break;
         }
+        case GameKind::Boxen:
+            gfx_->fillCircle(cx - half / 4, cy, half * 2 / 3, color);
+            gfx_->fillRoundRect(cx + half / 6, cy - half / 2, half, size - 2, 2, color);
+            break;
         case GameKind::Scale:
         case GameKind::None:
         default:
@@ -726,6 +734,40 @@ void TftDisplay::renderAwayTower() {
     int16_t x1, y1;
     uint16_t w, h;
     const char* label = "Block wird gezogen ...";
+    gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+    gfx_->setCursor((320 - w) / 2, 20);
+    gfx_->print(label);
+}
+
+// "Boxhandschuh trifft Sack" - analog zu BoxenAwayMoment.tsx: Boxsack haengt
+// rechts, ein Handschuh fliegt in einer Hin-und-her-Bewegung heran und
+// wieder zurueck (Ping-Pong statt Parabel/Kreisbahn wie bei den anderen
+// Spielen - passt besser zu einem Jab). Der Sack wackelt staerker, je naeher
+// der Handschuh gerade dran ist - kein echter Treffer-Trigger noetig, das
+// Wackeln folgt einfach der Ping-Pong-Position selbst.
+void TftDisplay::renderAwayBoxen() {
+    constexpr int16_t bagTopY = 55;
+    constexpr int16_t bagW = 32, bagH = 55;
+    constexpr int16_t bagCx = 270;
+
+    float t = fmodf((float)millis(), 1300.0f) / 1300.0f; // 0..1, Endlosschleife
+    float pp = t < 0.5f ? t * 2.0f : (1.0f - t) * 2.0f;   // 0 -> 1 -> 0 (hin und zurueck)
+    float wobble = sinf((float)millis() / 120.0f) * 2.0f * pp;
+
+    int16_t bagX = bagCx + (int16_t)wobble;
+    gfx_->drawFastVLine(bagX, 20, bagTopY - 20, creamColor_);
+    gfx_->fillRoundRect(bagX - bagW / 2, bagTopY, bagW, bagH, 10, coralColor_);
+
+    float gloveX = 30.0f + pp * (float)(bagX - bagW / 2 - 30 - 14);
+    int16_t gloveY = bagTopY + bagH / 2;
+    gfx_->fillCircle((int16_t)gloveX, gloveY, 10, emberColor_);
+    gfx_->fillRoundRect((int16_t)gloveX + 6, gloveY - 7, 9, 14, 3, emberColor_);
+
+    gfx_->setTextSize(2);
+    gfx_->setTextColor(COLOR_MUTED);
+    int16_t x1, y1;
+    uint16_t w, h;
+    const char* label = "Schlag wird gesetzt ...";
     gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
     gfx_->setCursor((320 - w) / 2, 20);
     gfx_->print(label);
