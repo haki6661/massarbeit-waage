@@ -7,9 +7,10 @@
 namespace {
     // Geraete-Spielauswahl (siehe TftDisplay::pickerNext()) - Reihenfolge +
     // Namen bewusst 1:1 zu GAME_REGISTRY in gameRegistry.ts (App-Repo)
-    // gepflegt. Manuell synchron halten statt per BLE zu uebertragen (siehe
-    // ROADMAP.md Punkt 1) - haelt den ersten Wurf einfach, auf Kosten davon,
-    // dass ein neues Spiel im App-Repo hier von Hand nachgezogen werden muss.
+    // gepflegt. Manuell synchron halten statt per BLE zu uebertragen - haelt
+    // den ersten Wurf einfach, auf Kosten davon, dass ein neues Spiel im
+    // App-Repo hier von Hand nachgezogen werden muss (siehe ROADMAP.md,
+    // "App-Sync: Geraete-Spielauswahl schaltet die App mit um").
     struct PickerGame {
         GameKind kind;
         const char* name;
@@ -33,8 +34,8 @@ namespace {
     // ersetzt ja 3 Original-Frames (STEP=3), laeuft aber weiter in Original-
     // Geschwindigkeit statt gerafft. Gilt bewusst als eigene, benannte
     // Konstante (nicht direkt in playBootSprite() vergraben): weitere
-    // Sprite-Animationen sind geplant (spaeter von SD statt SPIFFS geladen,
-    // siehe ROADMAP.md) - eine davon abweichende Zieldauer laesst sich dann
+    // Sprite-Animationen sind denkbar (spaeter ggf. von SD statt SPIFFS
+    // geladen) - eine davon abweichende Zieldauer laesst sich dann
     // pro Animation einfach als eigene Konstante danebenstellen, das
     // Pacing-Muster selbst (Frame-Start merken, Restzeit am Ende abwarten)
     // bleibt 1:1 wiederverwendbar.
@@ -279,8 +280,8 @@ void TftDisplay::renderGameConfirmedScreen(bool hx711Connected, bool bleConnecte
 
 // Zwischenzustand: ein Spieler ist am Zug (siehe setActivePlayer()), aber
 // gerade laeuft kein RemoteCue (z.B. kurz zwischen zwei Rituale-Schritten).
-// Kein Live-Gewicht mehr (siehe ROADMAP.md Punkt 1) - nur noch das Badge
-// plus ein schlichter Warte-Hinweis.
+// Kein Live-Gewicht mehr (war nur ein Debug-Hilfsmittel) - nur noch das
+// Badge plus ein schlichter Warte-Hinweis.
 void TftDisplay::renderWaitingForTurnScreen(bool hx711Connected, bool bleConnected) {
     gfx_->fillScreen(BLACK);
     renderPlayerBadge(6, 5);

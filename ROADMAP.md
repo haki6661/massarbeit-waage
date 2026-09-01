@@ -4,41 +4,17 @@ Lose Sammlung geplanter, noch nicht umgesetzter Änderungen — im Gegensatz
 zu den `TODO`-Kommentaren im Code (die sind lokal/klein), geht's hier um
 größere, noch nicht im Detail durchdachte Vorhaben.
 
-## 1. Taste 1 kurz: Tara raus, stattdessen Spiel-Schnellauswahl
+Umgesetzte Punkte werden hier **gelöscht**, nicht als "erledigt" stehen
+gelassen — was live ist, steht im Code und in der Git-Historie, und eine
+Roadmap voller Häkchen verdeckt nur, was noch offen ist.
 
-**Status:** ✅ Groesstenteils erledigt (Firmware 1.4.0). Taste 1 kurz schaltet
-durch die Spieleliste (`PICKER_GAMES` in `TftDisplay.cpp`), Taste 2 kurz
-bestaetigt ("X ausgewaehlt - jetzt in der App oeffnen"). Tara ist als eigene
-Tastenfunktion ersatzlos weg - laeuft nur noch automatisch (Auto-Zero-
-Nachfuehrung) oder ueber die App (BLE-Kommando 0x01). Deep Sleep unveraendert
-auf Taste 1 lang. Im Zuge dessen gleich die gesamte Live-Gewichtsanzeige
-(bisheriger `DisplayMode::Weight`/`Status`) durch Spielzustands-Anzeigen
-ersetzt (siehe unten, "generell Display").
+Die Nummerierung gruppiert thematisch (erst neue Spielmodi, dann Ausbau des
+Bestehenden, dann Hardware) und sagt **nichts über die Priorität**. Sie ist
+auch keine stabile ID: beim Aufräumen wird neu durchnummeriert. Code-
+Kommentare verweisen deshalb über den Titel eines Punktes hierher, nicht
+über seine Nummer.
 
-**Bewusst zurueckgestellt:**
-- Spieleliste ist fest im Firmware-Code hinterlegt, manuell synchron zu
-  `GAME_REGISTRY` in `gameRegistry.ts` (App-Repo) gepflegt - kein
-  automatischer/BLE-basierter Sync. Neues Spiel im App-Repo = `PICKER_GAMES`
-  von Hand nachziehen.
-- Kein automatisches Umschalten der App bei einer Geraete-Auswahl (App-Sync)
-  - die Bestaetigung/der eigentliche Spielstart passiert weiter von Hand in
-  der App. Waere ein groesserer Zusatzschritt (neue BLE-Notify-Richtung
-  Geraet->App + App-seitiger Listener) und ist eine eigene, noch nicht
-  angegangene Ausbaustufe.
-
-## 2. Boot beschleunigen, kein "Starte..."-Text mehr
-
-**Status:** ✅ Erledigt. `TftDisplay::playBootSprite()` zeigt sofort die
-Pixel-Art-Sprite-Animation (`data/`, siehe deren README) - kein
-Text-Screen mehr davor. Läuft parallel zur echten Initialisierung
-(`runNextBootStep()` in `main.cpp` erledigt battery/buttons/scale/BLE
-einen Schritt pro gezeigtem Frame) statt hinterher eine feste Dauer
-draufzuschlagen, plus die Serial-USB-Warteschleife von 3s auf 300ms
-verkürzt. Normaler Boot jetzt unter 2s statt vorher ~4-5s. Die Boot-Checks
-(HX711/Akku/BLE) sind als eigener Text-Screen komplett weg - nur bei
-tatsächlichem HX711-Fehler erscheint danach weiterhin eine Fehlermeldung.
-
-## 3. Neuer Spielmodus: nur Zeit stoppen ("Ex"-Modus, Glas muss leer sein)
+## 1. Neuer Spielmodus: nur Zeit stoppen ("Ex"-Modus, Glas muss leer sein)
 
 **Idee:** Ein einfacher Modus ohne Punkte-/Zielsystem wie bei den
 bestehenden Spielen (Golf/Dart/Blackjack/Tower) - es wird nur die Zeit
@@ -70,7 +46,7 @@ trinkt am schnellsten".
 
 **Status:** Nicht begonnen.
 
-## 4. Neuer Spielmodus: Eingießen statt Austrinken (Zielwert einschenken)
+## 2. Neuer Spielmodus: Eingießen statt Austrinken (Zielwert einschenken)
 
 **Idee:** Das Gegenteil der bisherigen Spiele (Golf/Dart/Blackjack/Tower
 zielen alle auf einen bestimmten Trink-/Abtrag-Wert ab, während das Glas
@@ -99,43 +75,7 @@ tatsächlichen Alkoholkonsum als reines Geschicklichkeitsspiel nutzen.
 
 **Status:** Nicht begonnen.
 
-## 5. Neuer Spielmodus: "Boxen" (Survival mit Lebensanzeige, Abweichung als Schaden)
-
-**Idee:** Angelehnt an das ungeplugged Trinkspiel "Grammtrinken" (siehe
-Recherche im Chat, z.B.
-[mybeerpong.com/blogs/trinkspiele/grammtrinken](https://mybeerpong.com/blogs/trinkspiele/grammtrinken)):
-reihum bestimmt ein Spieler per eigenem, zufälligem Schluck die
-Grammzahl, die die anderen treffen müssen. Anders als bei Golf/Dart -
-deren Ergebnis pro Runde für sich steht - wird hier die Abweichung vom
-Zielwert Runde für Runde **aufsummiert** ("Schaden"). Ab einem
-Schadens-Schwellwert ist ein Spieler "K.O." und scheidet aus - daher der
-Name "Boxen".
-
-**Warum:** Deckt einen Mechanismus ab, den es im bestehenden Katalog noch
-nicht gibt (laufendes Punktekonto/Ausscheiden statt unabhängiger
-Einzelrunden) - mehr Spannung über eine ganze Session statt nur je Zug.
-
-**Offene Fragen, noch nicht entschieden:**
-
-- Schadens-Schwellwert für K.O. (Vorlage "Grammtrinken" nutzt 100g
-  Gesamtabweichung) - fix oder einstellbar?
-- Wie viele "Leben"/wie grob die Lebensanzeige gestuft (z.B. 5-10 Segmente)
-  im Verhältnis zum Schadens-Schwellwert?
-- Eigenes `GameKind` (mit eigenem Icon/Away-Animation) - Boxhandschuh als
-  Motiv?
-
-**Entschieden:**
-- Session endet mit dem letzten Überlebenden (Battle-Royale-Stil) - kein
-  Fixrunden-/Ranglistenmodus.
-- Zielwert je Runde wird reihum von einem Spieler per eigenem,
-  zufälligem Schluck vorgegeben (wie beim Vorbild "Grammtrinken") - nicht
-  von der App vorgegeben/gewürfelt wie bei den bestehenden Spielen. Der
-  Vorgeber selbst nimmt in dieser Runde nicht am Matchen teil, die
-  übrigen Spieler müssen seinen Wert treffen.
-
-**Status:** Nicht begonnen.
-
-## 7. Physische Güte-Anzeige (miss/close/perfect) für Golf wiederherstellen
+## 3. Physische Güte-Anzeige (miss/close/perfect) für Golf wiederherstellen
 
 **Idee:** Golf zeigt seinen Reveal jetzt über ein eigenes "Grün" in der App
 (Ball + Fahne statt Tacho, siehe massarbeit-app PR #20) statt über den
@@ -164,28 +104,41 @@ Rückmeldung direkt auf der Waage war ein nettes Sofort-Feedback, bevor man
 
 **Status:** Nicht begonnen.
 
-## 9. Neues Gehäuse für die Waage entwerfen und drucken
+## 4. App-Sync: Geräte-Spielauswahl schaltet die App mit um
 
-**Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Waage, statt des
-aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
-`massarbeit_waage_base.stl`/`massarbeit_waage_platform.stl`).
+**Idee:** Die Geräte-Spielauswahl (Taste 1/2 auf der Waage, seit Firmware
+1.4.0) ist bis heute reine Anzeige: sie zeigt "X ausgewählt - jetzt in der
+App öffnen", das eigentliche Starten passiert weiter von Hand am Handy. Die
+Auswahl soll stattdessen in der App ankommen und dort direkt das passende
+Spiel öffnen.
 
-**Referenz/Inspiration:** [Smart DIY Kitchen Scale for Precision Cooking (instructables.com)](https://www.instructables.com/Smart-DIY-Kitchen-Scale-for-Precision-Cooking/)
+**Warum:** Der halbe Weg ist aktuell unbefriedigend - man wählt an der Waage
+etwas aus und muss es am Handy nochmal auswählen. Entweder die Auswahl am
+Gerät kann etwas, oder sie kann weg.
+
+**Was dafür fehlt:** eine BLE-Notify-Richtung Gerät -> App (bisher fließen
+Kommandos nur App -> Gerät, siehe `BLE_COMMAND_CHAR_UUID` in
+`include/Config.h`) plus ein App-seitiger Listener, der darauf hin die
+Navigation umschaltet. Deshalb bei der Einführung der Spielauswahl bewusst
+zurückgestellt und nicht mitgemacht.
 
 **Offene Fragen, noch nicht entschieden:**
 
-- Was genau soll sich ändern - Optik/Formsprache, Material-/Druckbarkeit
-  (Stützstruktur, Druckzeit), Passgenauigkeit fürs T-Display-S3-Board,
-  oder auch neue Anforderungen (z.B. Aussparung fürs in der Chat-Recherche
-  diskutierte SD-Kartenmodul fürs Speicherproblem)?
-- Komplett neuer Entwurf oder Weiterentwicklung des bestehenden
-  `massarbeit_waage_case.scad`?
-- Bleibt es bei OpenSCAD (parametrisch, gut versionierbar als Textdatei)
-  als Werkzeug?
+- Soll die App bei einer Geräte-Auswahl wirklich hart umschalten, oder nur
+  einen Vorschlag einblenden ("Waage schlägt Golf vor - öffnen?")? Hart
+  umschalten kann mitten in einer laufenden Runde stören.
+- Zweite, kleinere Hälfte desselben Themas: die Spieleliste `PICKER_GAMES`
+  (`TftDisplay.cpp`) wird von Hand synchron zu `GAME_REGISTRY`
+  (`gameRegistry.ts`, App-Repo) gepflegt - ein neues Spiel muss also an zwei
+  Stellen eingetragen werden. Mit einer Gerät->App-Richtung im Protokoll
+  wäre auch der umgekehrte Weg denkbar (App schickt die Spieleliste beim
+  Verbinden ans Gerät), dann fiele die doppelte Pflege weg.
+- Gilt nur für die große Waage - die Light-Variante (siehe unten) hat kein
+  Display und damit keine Geräte-Auswahl.
 
 **Status:** Nicht begonnen.
 
-## 10. Zweite Gerätevariante: "Maßarbeit Waage Light" (ESP32-C3, ohne Display)
+## 5. Zweite Gerätevariante: "Maßarbeit Waage Light" (ESP32-C3, ohne Display)
 
 **Idee:** Eine abgespeckte, deutlich billigere Waage auf einem kleinen
 ESP32-C3-Board **ohne TFT**. Sie wiegt und funkt, sonst nichts - das
@@ -313,8 +266,9 @@ läuft unverändert.
    unterscheidbar bleiben.
 5. **Bedienung mit nur einem Taster** (`Buttons.h` bekommt
    `#if MASSARBEIT_BUTTON_COUNT >= 2`): kurz = Tara, lang (2s) = Deep Sleep,
-   Doppelklick = Kalibrierroutine. Die Geräte-Spielauswahl (Punkt 1 dieser
-   Roadmap) entfällt ersatzlos - ohne Display gibt es nichts auszuwählen.
+   Doppelklick = Kalibrierroutine. Die Geräte-Spielauswahl entfällt
+   ersatzlos - ohne Display gibt es nichts auszuwählen (siehe auch
+   "App-Sync: Geräte-Spielauswahl schaltet die App mit um" weiter oben).
 6. **Deep Sleep:** der C3 kennt **kein `ext0`**. Statt
    `esp_sleep_enable_ext0_wakeup()` dort
    `esp_deep_sleep_enable_gpio_wakeup(BIT(pin), ESP_GPIO_WAKEUP_GPIO_LOW)`,
@@ -393,7 +347,8 @@ Manifest. Python ist ohnehin da, PlatformIO läuft darauf.
   3-Punkt-Eichung dort deckt den Alltagsfall schon ab.
 - Eigenes Gehäuse für die Light (viel kleiner, ohne Display-Ausschnitt) -
   eigener Entwurf oder parametrische Variante des bestehenden
-  `massarbeit_waage_case.scad`? Verzahnt sich mit Punkt 9.
+  `massarbeit_waage_case.scad`? Verzahnt sich mit "Neues Gehäuse für die
+  Waage entwerfen und drucken" weiter unten.
 - Sollen mehrere Waagen gleichzeitig an einer App-Instanz hängen können?
   Aktuell ist `sharedWeightSource` bewusst ein Singleton. Wäre eine eigene,
   deutlich größere Ausbaustufe - hier nur als Folgefrage notiert, weil
@@ -402,3 +357,24 @@ Manifest. Python ist ohnehin da, PlatformIO läuft darauf.
 **Status:** Nicht begonnen. Die Architekturentscheidung oben (eine
 Codebasis + zwei Build-Targets, eine App mit Laufzeit-Erkennung) ist
 getroffen, die Umsetzung steht noch komplett aus.
+
+## 6. Neues Gehäuse für die Waage entwerfen und drucken
+
+**Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Waage, statt des
+aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
+`massarbeit_waage_base.stl`/`massarbeit_waage_platform.stl`).
+
+**Referenz/Inspiration:** [Smart DIY Kitchen Scale for Precision Cooking (instructables.com)](https://www.instructables.com/Smart-DIY-Kitchen-Scale-for-Precision-Cooking/)
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Was genau soll sich ändern - Optik/Formsprache, Material-/Druckbarkeit
+  (Stützstruktur, Druckzeit), Passgenauigkeit fürs T-Display-S3-Board,
+  oder auch neue Anforderungen (z.B. Aussparung fürs in der Chat-Recherche
+  diskutierte SD-Kartenmodul fürs Speicherproblem)?
+- Komplett neuer Entwurf oder Weiterentwicklung des bestehenden
+  `massarbeit_waage_case.scad`?
+- Bleibt es bei OpenSCAD (parametrisch, gut versionierbar als Textdatei)
+  als Werkzeug?
+
+**Status:** Nicht begonnen.

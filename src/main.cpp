@@ -37,17 +37,18 @@ unsigned long lastActivityMs = 0;
 float lastActivityWeight = 0.0f;
 bool activityBaselineSet = false;
 
-// Taste 1 kurz: Geraete-Spielauswahl, naechste Option (siehe ROADMAP.md
-// Punkt 1). Tara gibt es als eigene Tastenfunktion nicht mehr - laeuft nur
-// noch automatisch (Auto-Zero-Nachfuehrung, siehe Scale.cpp) oder ueber die
-// App (BLE-Kommando 0x01).
+// Taste 1 kurz: Geraete-Spielauswahl, naechste Option. Tara gibt es als
+// eigene Tastenfunktion nicht mehr - laeuft nur noch automatisch
+// (Auto-Zero-Nachfuehrung, siehe Scale.cpp) oder ueber die App
+// (BLE-Kommando 0x01).
 void onButton1Click() {
     display.pickerNext();
     lastActivityMs = millis();
 }
 
 // Taste 2 kurz: Geraete-Spielauswahl bestaetigen. Rein lokale Anzeige, kein
-// automatisches Umschalten der App (siehe ROADMAP.md Punkt 1).
+// automatisches Umschalten der App (siehe ROADMAP.md, "App-Sync:
+// Geraete-Spielauswahl schaltet die App mit um").
 void onButton2Click() {
     display.pickerConfirm();
     lastActivityMs = millis();
@@ -89,7 +90,7 @@ void enterDeepSleep() {
 // aufgerufen - erledigt EINEN Initialisierungsschritt pro Aufruf und gibt
 // true zurueck, solange noch etwas zu tun ist. So laeuft die Bootanimation
 // parallel zur echten Initialisierung, statt hinterher eine feste Dauer
-// draufzuschlagen (siehe ROADMAP.md, Punkt 2).
+// draufzuschlagen.
 bool runNextBootStep() {
     static uint8_t step = 0;
     switch (step++) {
@@ -128,7 +129,7 @@ void setup() {
     // device monitor`, das kurz vor dem Einschalten schon laeuft) - im
     // normalen Party-Betrieb (Akku, kein USB-Kabel/Monitor) wuerde das
     // bisherige 3s-Timeout jedes Mal ungenutzt verstreichen, bevor ueberhaupt
-    // mit der eigentlichen Initialisierung begonnen wird (siehe ROADMAP.md).
+    // mit der eigentlichen Initialisierung begonnen wird.
     while (!Serial && millis() - waitStart < 300) {
         delay(10);
     }

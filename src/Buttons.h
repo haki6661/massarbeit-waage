@@ -11,9 +11,9 @@
 //   Taste 2 (GPIO14):     kurzer Klick -> Geraete-Spielauswahl: bestaetigen
 //                          langer Druck (1,5s) -> Kalibrierroutine starten
 //
-// Tara gibt es als eigene Tastenfunktion nicht mehr (siehe ROADMAP.md
-// Punkt 1) - laeuft nur noch automatisch (Auto-Zero-Nachfuehrung, siehe
-// Scale.cpp) oder ueber die App (BLE-Kommando 0x01).
+// Tara gibt es als eigene Tastenfunktion nicht mehr - laeuft nur noch
+// automatisch (Auto-Zero-Nachfuehrung, siehe Scale.cpp) oder ueber die App
+// (BLE-Kommando 0x01).
 //
 // Aufwachen aus dem Deep Sleep passiert NICHT ueber Taste 1, sondern immer
 // ueber Taste 2 (siehe main.cpp) - GPIO0/Taste 1 ist ein Strapping-Pin
