@@ -75,7 +75,78 @@ tatsächlichen Alkoholkonsum als reines Geschicklichkeitsspiel nutzen.
 
 **Status:** Nicht begonnen.
 
-## 3. Physische Güte-Anzeige (miss/close/perfect) für Golf wiederherstellen
+## 3. Olympiade: alle Spiele am Stück, Platzierungen über den ganzen Abend
+
+**Idee:** Ein Turniermodus über den gesamten Katalog. Alle Spiele werden
+nacheinander durchgespielt, jedes ist eine "Disziplin". Die Platzierung
+jedes Spielers wird pro Disziplin festgehalten und über alle Disziplinen
+hinweg mitgeführt. Am Ende steht die Siegerehrung: ein Treppchen mit den
+ersten drei Plätzen und einer Animation dazu.
+
+**Warum:** Bisher steht jede Runde für sich - man spielt Golf, dann
+vielleicht Dart, und nichts verbindet die beiden. Die Olympiade gibt dem
+Abend einen Bogen mit Anfang und Ende und einen Grund, auch das Spiel
+mitzuspielen, in dem man schlecht ist. "Boxen" hat diesen Gedanken schon
+innerhalb eines Spiels (laufendes Konto statt Einzelrunden) - die Olympiade
+zieht ihn eine Ebene höher, über die Spiele hinweg.
+
+**Was dafür fehlt - der eigentliche Knackpunkt:** `GamePlugin` (siehe
+`src/lib/types.ts` im App-Repo) kann heute nur *einen Sieger* melden:
+`checkWinner()` liefert ein `WinnerResult` mit genau einer `playerId`/
+`teamId`. Eine Olympiade braucht aber die **vollständige Reihenfolge aller
+Spieler** einer Disziplin, nicht nur Platz 1. Das Interface braucht also
+etwas wie ein `getRanking?(state, players, teams)`, das die Spieler-IDs
+sortiert zurückgibt - und jedes Spiel muss das beantworten können:
+
+- **Golf/Dart/Blackjack/Wackelturm:** haben eine Punktzahl/Distanz je
+  Spieler, daraus lässt sich sortieren.
+- **Boxen:** scheidet Spieler nacheinander aus - die Rangfolge ist die
+  umgekehrte K.O.-Reihenfolge, dafür muss die Ausscheide-Reihenfolge
+  überhaupt erst mitgeschrieben werden.
+- **Scale:** hat bewusst gar kein Scoring (siehe `shortDescription`) und
+  gehört nicht in eine Olympiade - genauso wenig wie Spiele mit
+  `comingSoon: true`.
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Wie werden Platzierungen in eine Gesamtwertung verrechnet? Drei
+  Kandidaten: olympisch (nur Medaillen zählen, Gold vor Silber vor Bronze),
+  Formel-1-artig (Punkte je Platz, z.B. 10/8/6/5/…) oder golfartig (Summe
+  der Platzziffern, niedrigste gewinnt). Die drei fühlen sich sehr
+  unterschiedlich an: bei Variante 1 ist ein vierter Platz genauso wertlos
+  wie der letzte, bei Variante 3 zählt jede Disziplin gleich viel.
+- Wo lebt der Turnierstand? `useGameRuntimeStore` hält heute genau ein
+  laufendes Spiel; der Olympiade-Stand muss den Wechsel zwischen
+  `GameScreen`, Katalog und Lobby überleben. Eigener Store oder eine
+  Erweiterung des bestehenden?
+- Reihenfolge der Disziplinen: feste Reihenfolge, ausgelost, oder wählt der
+  jeweils Führende/Letzte das nächste Spiel?
+- Alle Spiele Pflicht oder Auswahl? Sechs Disziplinen mit mehreren Spielern
+  sind ein sehr langer Abend - vermutlich braucht es eine "kurze Olympiade"
+  mit auswählbarer Teilmenge.
+- Gleichstand: auf dem Treppchen und in der Gesamtwertung. Stichkampf,
+  geteilter Platz, oder entscheidet eine bestimmte Disziplin?
+- Teams: `GamePlugin` kennt `supportsTeams`, aber nicht jedes Spiel
+  unterstützt sie. Läuft die Olympiade grundsätzlich als Einzelwertung,
+  oder sollen Teams mitgeführt werden - und was passiert dann in einer
+  Disziplin ohne Team-Unterstützung?
+- Abbruch mittendrin: was passiert mit einer Olympiade, die nach drei von
+  sechs Disziplinen endet (die Party ist ja irgendwann vorbei)? Wertung des
+  Zwischenstands anbieten oder verwerfen?
+- Zeigt die Waage bei der Siegerehrung mit? Dafür bräuchte es einen neuen
+  `RemoteCue` und eine Treppchen-Animation im Display-Code - und die
+  Light-Variante (siehe unten) hat kein Display, könnte den Moment
+  höchstens über die Status-LED andeuten.
+
+**Zur Siegerehrung selbst:** Treppchen mit Platz 1/2/3, die Spieler in
+ihren Lobby-Farben. Stilistisch an den bestehenden Reveal-Ritualen
+orientieren (`SipRevealOverlay`, die spielspezifischen Reveal-Komponenten) -
+also Spannungsaufbau vor der Auflösung, statt das Ergebnis einfach
+hinzustellen: erst Bronze, dann Silber, dann Gold.
+
+**Status:** Nicht begonnen.
+
+## 4. Physische Güte-Anzeige (miss/close/perfect) für Golf wiederherstellen
 
 **Idee:** Golf zeigt seinen Reveal jetzt über ein eigenes "Grün" in der App
 (Ball + Fahne statt Tacho, siehe massarbeit-app PR #20) statt über den
@@ -104,7 +175,7 @@ Rückmeldung direkt auf der Waage war ein nettes Sofort-Feedback, bevor man
 
 **Status:** Nicht begonnen.
 
-## 4. App-Sync: Geräte-Spielauswahl schaltet die App mit um
+## 5. App-Sync: Geräte-Spielauswahl schaltet die App mit um
 
 **Idee:** Die Geräte-Spielauswahl (Taste 1/2 auf der Waage, seit Firmware
 1.4.0) ist bis heute reine Anzeige: sie zeigt "X ausgewählt - jetzt in der
@@ -138,7 +209,7 @@ zurückgestellt und nicht mitgemacht.
 
 **Status:** Nicht begonnen.
 
-## 5. Zweite Gerätevariante: "Maßarbeit Waage Light" (ESP32-C3, ohne Display)
+## 6. Zweite Gerätevariante: "Maßarbeit Waage Light" (ESP32-C3, ohne Display)
 
 **Idee:** Eine abgespeckte, deutlich billigere Waage auf einem kleinen
 ESP32-C3-Board **ohne TFT**. Sie wiegt und funkt, sonst nichts - das
@@ -358,7 +429,7 @@ Manifest. Python ist ohnehin da, PlatformIO läuft darauf.
 Codebasis + zwei Build-Targets, eine App mit Laufzeit-Erkennung) ist
 getroffen, die Umsetzung steht noch komplett aus.
 
-## 6. Neues Gehäuse für die Waage entwerfen und drucken
+## 7. Neues Gehäuse für die Waage entwerfen und drucken
 
 **Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Waage, statt des
 aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
