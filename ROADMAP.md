@@ -115,21 +115,12 @@ Name "Boxen".
 nicht gibt (laufendes Punktekonto/Ausscheiden statt unabhängiger
 Einzelrunden) - mehr Spannung über eine ganze Session statt nur je Zug.
 
-**Lebensanzeige in Retro-Pixel-Optik:** Statt reinem Zahlenwert soll der
-verbleibende "Lebensbalken" auf dem Waagen-Display als Pixel-Art-Element
-dargestellt werden, sinkend mit jedem Treffer - passend zum bereits
-geplanten Ausbau der Pixel-Art-Animationen für weitere Game-States (siehe
-Chat-Diskussion zu Boot-Sprite/SD-Karten-Speicherlösung, noch nicht als
-eigener Roadmap-Punkt festgehalten). Setzt also auf denselben
-Sprite-Player auf, der ohnehin für die anderen Zustände (Ready/Away/
-Result) geplant ist.
-
 **Offene Fragen, noch nicht entschieden:**
 
 - Schadens-Schwellwert für K.O. (Vorlage "Grammtrinken" nutzt 100g
   Gesamtabweichung) - fix oder einstellbar?
-- Wie viele "Leben"/wie grob die Lebensanzeige gestuft (z.B. 5-10 Segmente
-  in Pixel-Optik) im Verhältnis zum Schadens-Schwellwert?
+- Wie viele "Leben"/wie grob die Lebensanzeige gestuft (z.B. 5-10 Segmente)
+  im Verhältnis zum Schadens-Schwellwert?
 - Eigenes `GameKind` (mit eigenem Icon/Away-Animation) - Boxhandschuh als
   Motiv?
 
@@ -170,29 +161,6 @@ Rückmeldung direkt auf der Waage war ein nettes Sofort-Feedback, bevor man
   füllen, aber `GameScreen` per Flag (z.B. `hasCustomReveal`) davon
   abhalten, den Tacho selbst zu rendern - würde `classifySipQuality()`
   unverändert weiter funktionieren lassen.
-
-**Status:** Nicht begonnen.
-
-## 8. Golf-"Grün" mit Pixel-Art-Texturen statt flachem Farbverlauf
-
-**Idee:** Das neue Golf-Grün in der App (siehe massarbeit-app PR #20-#25 -
-Ball+Fahne statt Tacho, eigene Pixelart-Fahnen-Sprite-Animation) nutzt aktuell
-nur einen flachen Farbverlauf als Untergrund. Passend zur bereits gewählten
-Pixel-Art-Fahne soll die ganze Grün-Fläche selbst auch strukturiertes
-Pixel-Art-Terrain bekommen (z.B. Gras-/Fairway-Textur, evtl. mit leichtem
-Rasenmuster-Streifen wie bei echten Golfplätzen).
-
-**Warum:** Konsistenter visueller Stil - aktuell wirkt die Fahne (Pixel-Art)
-und der Untergrund (glatter CSS-Gradient) stilistisch nicht zusammengehörig.
-
-**Offene Fragen, noch nicht entschieden:**
-
-- Als Tile-Textur (kleines wiederholtes Pixel-Art-Muster, per CSS
-  `background-image`/`background-repeat`) oder als volles, einmalig
-  gezeichnetes Hintergrundbild pro Zeile?
-- Selbst gezeichnet (wie die Fahne) oder ebenfalls vom Nutzer geliefert?
-- Bewegt sich die Textur mit (Parallax/Scroll-Effekt bei Ball-/Fahnen-
-  Bewegung) oder bleibt sie starr?
 
 **Status:** Nicht begonnen.
 
