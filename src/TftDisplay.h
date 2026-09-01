@@ -122,14 +122,19 @@ private:
     Arduino_DataBus* bus_ = nullptr;
     Arduino_GFX* gfx_ = nullptr;
 
-    // Café-Kreide-Akzentfarben der Handy-App (src/styles/globals.css im
-    // App-Repo) angenaehert auf RGB565 - einmal in begin() berechnet statt
-    // in jeder Render-Funktion neu (gfx_->color565() ist zwar billig, aber
-    // so gibt es nur eine Quelle der Wahrheit fuers Farbschema).
-    uint16_t emberColor_ = 0;
-    uint16_t zestColor_ = 0;
-    uint16_t creamColor_ = 0;
-    uint16_t coralColor_ = 0;
+    // Akzentfarben 1:1 aus dem neuen App-Design uebernommen (src/styles/
+    // globals.css im App-Repo, an Accios UI-Manifest angelehnt: dunkler
+    // Grund, ein Akzent "Sonnenuntergang", Status-Farben success/danger/
+    // warning) - einmal in begin() aus den exakt gleichen Hex-Werten
+    // berechnet statt in jeder Render-Funktion neu, damit Handy-App und
+    // Waagen-Display exakt dieselbe Farbsprache tragen. Ersetzt die
+    // frueheren Café-Kreide-Namen (ember/zest/cream/coral).
+    uint16_t accentColor_ = 0;   // --color-accent (#f28a4a)
+    uint16_t successColor_ = 0;  // --color-success (#66bb6a)
+    uint16_t dangerColor_ = 0;   // --color-danger (#ef5350)
+    uint16_t warningColor_ = 0;  // --color-warning (#ffa726)
+    uint16_t textColor_ = 0;     // --color-text (#f2f4f7)
+    uint16_t mutedColor_ = 0;    // --color-text-muted (#9aa1ad)
 
     uint32_t lastRenderMs_ = 0;
     bool forceRedraw_ = true;
@@ -139,6 +144,26 @@ private:
     RemoteCue remoteCue_ = RemoteCue::None;
     GameKind remoteCueGame_ = GameKind::None; // nur fuer RemoteCue::Away relevant
     uint32_t remoteCueSetMs_ = 0;
+
+    // Flacker-Fix fuer renderRemoteCueScreen()/renderAway*(): diese Screens
+    // laufen als Endlosanimation (Puls-Glow bzw. bewegtes Motiv) und werden
+    // alle ~150ms neu gezeichnet, solange der Cue aktiv ist. Ein volles
+    // fillScreen(BLACK) + Neuzeichnen bei JEDEM dieser Frames verursacht ein
+    // sichtbares Schwarz-Aufblitzen (das gemeldete "Flackern") - deshalb
+    // werden unveraenderliche Teile (Titel/Badge-Fuellung bzw. Fairway/
+    // Dartscheibe/Kartenstapel/Restturm/Sack) nur EINMAL beim Betreten des
+    // Cues gezeichnet, und pro Frame nur noch die tatsaechlich bewegte
+    // Flaeche an ihrer alten Position schwarz uebermalt ("Dirty Rect") statt
+    // den ganzen Bildschirm zu leeren.
+    RemoteCue lastCueRendered_ = RemoteCue::None;
+    int16_t lastGlowR_ = -1;
+    GameKind awayStaticGame_ = GameKind::None; // welches Spiel die statischen Away-Elemente zuletzt zeigte
+    int16_t prevGolfBallX_ = -1000, prevGolfBallY_ = -1000;
+    int16_t prevDartMinX_ = -1000, prevDartMinY_ = 0, prevDartMaxX_ = 0, prevDartMaxY_ = 0;
+    int16_t prevCardLeft_ = -1000, prevCardW_ = 0;
+    int16_t prevTowerX_ = -1000, prevTowerY_ = 0;
+    int16_t prevGloveX_ = -1000, prevGloveY_ = 0;
+    int16_t prevBagX_ = -1000;
 
     bool hasActivePlayer_ = false;
     GameKind activeGame_ = GameKind::None;
@@ -159,6 +184,19 @@ private:
     void renderRemoteCueScreen(RemoteCue cue);
     void renderPlayerBadge(int16_t x, int16_t y);
     void renderGameIcon(GameKind game, int16_t cx, int16_t cy, int16_t size, uint16_t color);
+
+    // Kategoriale Kennfarbe je Spiel - exakt dieselben Hex-Werte wie
+    // `game.accent.solid` je GamePlugin im App-Repo (GolfGame.tsx etc.), auf
+    // RGB565 umgerechnet. Ersetzt die vorherige Einheitsfarbe (immer Zest)
+    // fuer Auswahl-Icon/Bestaetigt-Titel, damit ein Spiel auf Waage UND App
+    // an derselben Farbe erkennbar ist.
+    uint16_t gameAccentColor(GameKind game) const;
+
+    // Zentriert `text` horizontal, mit der Textoberkante bei `topY` -
+    // funktioniert unveraendert fuer den eingebauten Bitmap-Font (Cursor-Y
+    // = Textoberkante) UND fuer einen eigenen GFXfont wie FreeSansBold10pt7b
+    // (Cursor-Y = Grundlinie, deshalb Korrektur um y1 aus getTextBounds()).
+    void printCentered(const char* text, int16_t topY, uint16_t color);
 
     void renderAwayGolf();
     void renderAwayDart();

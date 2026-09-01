@@ -8,7 +8,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.4.1"
+#define FIRMWARE_VERSION "1.5.0"
 
 // ============================================================================
 // BLE-Konfiguration

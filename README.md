@@ -16,6 +16,19 @@ per BLE" weiter unten) + Entwicklungs-OTA per WLAN. Die Away-/Ergebnis-
 Animationen (nicht der Boot) sind weiterhin rein prozedural aus
 Linien/Kreisen/Formen, kein Sprite noetig.
 
+**UI-Relaunch (Firmware 1.5.0):** Die TFT-Anzeige tragt jetzt dieselbe
+Farbsprache wie die neu gestaltete Handy-App (dunkler Grund, ein Akzent
+"Sonnenuntergang", success/danger/warning-Statusfarben - siehe
+`TftDisplay::begin()`), je Spiel eine eigene Kennfarbe (statt vorher immer
+Olivgruen) sowie eine kraeftige, geometrische Bold-Schrift
+(`FreeSansBold10pt7b`, `include/`) fuer Spielname/Cue-Titel statt des
+technischen 5x7-Pixel-Fonts. Ausserdem: die Puls-/Away-Animationen
+(BEREIT/VOLLTREFFER/Away-Motive) zeichnen unveraenderliche Bildteile nur noch
+einmal und radieren pro Frame nur noch die tatsaechlich bewegte Flaeche
+("Dirty Rect") statt bei jedem ~150ms-Redraw den kompletten Bildschirm zu
+leeren - behebt das sichtbare Schwarz-Aufblitzen waehrend laufender
+Animationen.
+
 ## Hardware
 
 - LilyGO T-Display S3

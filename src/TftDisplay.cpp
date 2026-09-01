@@ -1,11 +1,10 @@
 #include "TftDisplay.h"
 #include "BoardConfig.h"
+#include "FreeSansBold10pt7b.h"
 #include <SPIFFS.h>
 #include <math.h>
 
 namespace {
-    constexpr uint16_t COLOR_MUTED = 0x7BEF; // grau
-
     // Geraete-Spielauswahl (siehe TftDisplay::pickerNext()) - Reihenfolge +
     // Namen bewusst 1:1 zu GAME_REGISTRY in gameRegistry.ts (App-Repo)
     // gepflegt. Manuell synchron halten statt per BLE zu uebertragen (siehe
@@ -71,12 +70,27 @@ void TftDisplay::begin() {
     // wie das Board eingebaut/gehalten wird.
     gfx_->setRotation(3);
     gfx_->fillScreen(BLACK);
-    gfx_->setTextColor(WHITE);
 
-    emberColor_ = gfx_->color565(0xD9, 0x72, 0x3A);
-    zestColor_  = gfx_->color565(0x9F, 0xBF, 0x3F);
-    creamColor_ = gfx_->color565(0xFD, 0xF0, 0xD9);
-    coralColor_ = gfx_->color565(0xC8, 0x5A, 0x3F);
+    // Exakt dieselben Hex-Werte wie die neuen App-Design-Tokens (siehe
+    // src/styles/globals.css im App-Repo, an Accios UI-Manifest angelehnt) -
+    // einmal hier auf RGB565 umgerechnet statt in jeder Render-Funktion neu.
+    // Ersetzt die vorherige Café-Kreide-Palette (ember/zest/cream/coral).
+    accentColor_  = gfx_->color565(0xF2, 0x8A, 0x4A); // --color-accent
+    successColor_ = gfx_->color565(0x66, 0xBB, 0x6A); // --color-success
+    dangerColor_  = gfx_->color565(0xEF, 0x53, 0x50); // --color-danger
+    warningColor_ = gfx_->color565(0xFF, 0xA7, 0x26); // --color-warning
+    textColor_    = gfx_->color565(0xF2, 0xF4, 0xF7); // --color-text
+    mutedColor_   = gfx_->color565(0x9A, 0xA1, 0xAD); // --color-text-muted
+
+    gfx_->setTextColor(textColor_);
+    // Kraeftige, geometrische Bold-Schrift statt des klassischen 5x7-Bitmap-
+    // Fonts fuer die grossen, oft gelesenen Texte (Spielname, Cue-Titel wie
+    // "BEREIT!") - naeher an der Outfit-Schriftfamilie der App als der
+    // vorherige technische Pixel-Font. Kleine Hinweistexte/Labels bleiben
+    // bewusst beim eingebauten Font (siehe printCentered()/direkte
+    // setCursor()-Aufrufe ohne vorheriges setFont()) - ein Bold-Font in
+    // sehr kleiner Groesse wuerde nur zu einem verwaschenen Klumpen.
+    gfx_->setFont(&FreeSansBold10pt7b);
 }
 
 namespace {
@@ -172,52 +186,66 @@ void TftDisplay::pickerConfirm() {
 // Fusszeile (die je nach Screen unterschiedlich viel Platz brauchte).
 void TftDisplay::renderIdleFooter(bool hx711Connected, bool bleConnected) {
     (void)hx711Connected; // HX711-Fehler wird vorher schon als eigener Screen abgefangen
-    uint16_t bleColor = bleConnected ? zestColor_ : COLOR_MUTED;
+    uint16_t bleColor = bleConnected ? successColor_ : mutedColor_;
     gfx_->fillCircle(307, 13, 4, bleColor);
+}
+
+void TftDisplay::printCentered(const char* text, int16_t topY, uint16_t color) {
+    int16_t x1, y1;
+    uint16_t w, h;
+    gfx_->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+    gfx_->setTextColor(color);
+    // y1 ist beim eingebauten Bitmap-Font 0 (Cursor = Textoberkante, Formel
+    // bleibt unveraendert `topY`), bei einem eigenen GFXfont dagegen negativ
+    // (Cursor = Grundlinie) - das Abziehen von y1 gleicht beide Faelle
+    // einheitlich auf "Textoberkante bei topY" aus.
+    gfx_->setCursor((320 - (int16_t)w) / 2, topY - y1);
+    gfx_->print(text);
 }
 
 void TftDisplay::renderGamePickerScreen(bool hx711Connected, bool bleConnected) {
     gfx_->fillScreen(BLACK);
 
     if (!hx711Connected) {
-        gfx_->setTextColor(coralColor_);
         gfx_->setTextSize(2);
-        gfx_->setCursor(8, 60);
-        gfx_->print("HX711 Fehler");
+        printCentered("HX711 Fehler", 60, dangerColor_);
+        gfx_->setFont(nullptr);
         gfx_->setTextSize(1);
-        gfx_->setTextColor(COLOR_MUTED);
         gfx_->setCursor(8, 90);
+        gfx_->setTextColor(mutedColor_);
         gfx_->print("Verkabelung pruefen");
+        gfx_->setFont(&FreeSansBold10pt7b);
         return;
     }
 
-    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->setFont(nullptr);
+    gfx_->setTextColor(mutedColor_);
     gfx_->setTextSize(1);
     gfx_->setCursor(8, 12);
     gfx_->print("Spiel waehlen");
+    gfx_->setFont(&FreeSansBold10pt7b);
 
     const PickerGame& game = PICKER_GAMES[pickerIndex_];
-    renderGameIcon(game.kind, 160, 62, 42, zestColor_);
+    uint16_t gameColor = gameAccentColor(game.kind);
+    renderGameIcon(game.kind, 160, 62, 42, gameColor);
 
-    int16_t x1, y1;
-    uint16_t w, h;
-    gfx_->setTextSize(3);
-    gfx_->setTextColor(WHITE);
-    gfx_->getTextBounds(game.name, 0, 0, &x1, &y1, &w, &h);
-    gfx_->setCursor((320 - w) / 2, 98);
-    gfx_->print(game.name);
+    gfx_->setTextSize(2);
+    printCentered(game.name, 88, textColor_);
 
     char posBuf[8];
     snprintf(posBuf, sizeof(posBuf), "%u / %u", pickerIndex_ + 1, PICKER_GAME_COUNT);
+    gfx_->setFont(nullptr);
     gfx_->setTextSize(1);
-    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->setTextColor(mutedColor_);
+    int16_t x1, y1;
+    uint16_t w, h;
     gfx_->getTextBounds(posBuf, 0, 0, &x1, &y1, &w, &h);
     gfx_->setCursor((320 - w) / 2, 128);
     gfx_->print(posBuf);
 
-    gfx_->setTextColor(COLOR_MUTED);
     gfx_->setCursor(8, 152);
     gfx_->print("Taste1: wechseln   Taste2: waehlen");
+    gfx_->setFont(&FreeSansBold10pt7b);
 
     renderIdleFooter(hx711Connected, bleConnected);
 }
@@ -225,27 +253,26 @@ void TftDisplay::renderGamePickerScreen(bool hx711Connected, bool bleConnected) 
 void TftDisplay::renderGameConfirmedScreen(bool hx711Connected, bool bleConnected) {
     gfx_->fillScreen(BLACK);
     const PickerGame& game = PICKER_GAMES[pickerIndex_];
+    uint16_t gameColor = gameAccentColor(game.kind);
 
-    renderGameIcon(game.kind, 160, 52, 36, zestColor_);
+    renderGameIcon(game.kind, 160, 52, 36, gameColor);
 
+    gfx_->setTextSize(2);
+    printCentered(game.name, 78, successColor_);
+
+    gfx_->setFont(nullptr);
+    gfx_->setTextSize(1);
+    gfx_->setTextColor(mutedColor_);
+    const char* hint = "In der App oeffnen";
     int16_t x1, y1;
     uint16_t w, h;
-    gfx_->setTextSize(3);
-    gfx_->setTextColor(zestColor_);
-    gfx_->getTextBounds(game.name, 0, 0, &x1, &y1, &w, &h);
-    gfx_->setCursor((320 - w) / 2, 88);
-    gfx_->print(game.name);
-
-    const char* hint = "In der App oeffnen";
-    gfx_->setTextSize(1);
-    gfx_->setTextColor(COLOR_MUTED);
     gfx_->getTextBounds(hint, 0, 0, &x1, &y1, &w, &h);
     gfx_->setCursor((320 - w) / 2, 122);
     gfx_->print(hint);
 
-    gfx_->setTextColor(COLOR_MUTED);
     gfx_->setCursor(8, 152);
     gfx_->print("Taste1: anderes Spiel");
+    gfx_->setFont(&FreeSansBold10pt7b);
 
     renderIdleFooter(hx711Connected, bleConnected);
 }
@@ -258,15 +285,17 @@ void TftDisplay::renderWaitingForTurnScreen(bool hx711Connected, bool bleConnect
     gfx_->fillScreen(BLACK);
     renderPlayerBadge(6, 5);
 
+    gfx_->setFont(nullptr);
     gfx_->setTextSize(2);
     gfx_->setCursor(8, 70);
     if (!hx711Connected) {
-        gfx_->setTextColor(coralColor_);
+        gfx_->setTextColor(dangerColor_);
         gfx_->print("HX711 Fehler");
     } else {
-        gfx_->setTextColor(COLOR_MUTED);
+        gfx_->setTextColor(mutedColor_);
         gfx_->print("Bereit ...");
     }
+    gfx_->setFont(&FreeSansBold10pt7b);
 
     renderIdleFooter(hx711Connected, bleConnected);
 }
@@ -385,11 +414,25 @@ void TftDisplay::setRemoteCue(RemoteCue cue, GameKind game) {
     remoteCueGame_ = game;
     remoteCueSetMs_ = millis();
     forceRedraw_ = true; // sofort anzeigen, nicht auf den 150ms-Drossel-Timer warten
+
+    // Neuer Cue = neuer Render-Kontext: alle "letzte Position"-Merker fuer
+    // den Flacker-Fix (siehe TftDisplay.h) zuruecksetzen, damit renderAway*()
+    // beim naechsten Aufruf die statischen Elemente frisch zeichnet statt
+    // (faelschlich) etwas an einer stehengebliebenen alten Position
+    // wegzuradieren, und renderRemoteCueScreen() den Puls-Ring ebenfalls neu
+    // aufbaut statt nur den alten Ring zu loeschen.
+    lastCueRendered_ = RemoteCue::None;
+    lastGlowR_ = -1;
+    awayStaticGame_ = GameKind::None;
+    prevGolfBallX_ = -1000;
+    prevDartMinX_ = -1000;
+    prevCardLeft_ = -1000;
+    prevTowerX_ = -1000;
+    prevGloveX_ = -1000;
+    prevBagX_ = -1000;
 }
 
 void TftDisplay::renderRemoteCueScreen(RemoteCue cue) {
-    gfx_->fillScreen(BLACK);
-
     if (cue == RemoteCue::Away) {
         // Welches Spiel gerade laeuft, bestimmt die Animation - jedes Spiel
         // hat sein eigenes kleines Warte-Motiv (analog zu den AwayMoment-
@@ -433,75 +476,91 @@ void TftDisplay::renderRemoteCueScreen(RemoteCue cue) {
         case RemoteCue::Ready:
             title = "BEREIT!";
             subtitle = hasActivePlayer_ ? activePlayerName_.c_str() : "Jetzt trinken";
-            color = hasActivePlayer_ ? activePlayerColor565_ : zestColor_;
+            color = hasActivePlayer_ ? activePlayerColor565_ : successColor_;
             showCheck = true;
             break;
         case RemoteCue::ResultPerfect:
             title = "VOLLTREFFER!";
             subtitle = "";
-            color = zestColor_;
+            color = successColor_;
             showCheck = true;
             break;
         case RemoteCue::ResultClose:
             title = "NAH DRAN";
             subtitle = "";
-            color = emberColor_;
+            color = accentColor_;
             showRing = true;
             break;
         case RemoteCue::ResultMiss:
         default:
             title = "DANEBEN";
             subtitle = "";
-            color = coralColor_;
+            color = dangerColor_;
             showCross = true;
             break;
     }
 
-    // Badge mittig oben, Text darunter zentriert (per getTextBounds, wie im
-    // Original) - so kollidiert das Badge nie mit unterschiedlich langen
-    // Titeln ("DANEBEN" vs. "VOLLTREFFER!"), die Breite ist beim Zentrieren
-    // schon beruecksichtigt.
     constexpr int16_t badgeCx = 160;
     constexpr int16_t badgeCy = 42;
     constexpr int16_t badgeR = 26;
-    // Sanfter Puls, wie beim BEREIT-Zustand der App (glow-zest) - simpler
-    // Sinus auf dem Radius statt einer echten Glow-Textur.
+
+    // Flacker-Fix: Badge-Fuellung, Marker (Haken/Kreuz/Ring) und Texte sind
+    // pro Cue vollkommen statisch - nur der duenne Puls-Glow um das Badge
+    // aendert seinen Radius von Frame zu Frame. Ein voller fillScreen(BLACK)
+    // + Neuzeichnen alle ~150ms (bis zu 20s lang beim BEREIT-Cue) erzeugte
+    // dabei ein sichtbares Schwarz-Aufblitzen. Deshalb: den statischen Teil
+    // nur EINMAL zeichnen, wenn sich der Cue tatsaechlich geaendert hat -
+    // in jedem weiteren Frame desselben Cues nur noch den alten Glow-Ring
+    // uebermalen und den neuen zeichnen.
+    bool freshCue = (cue != lastCueRendered_);
+    if (freshCue) {
+        gfx_->fillScreen(BLACK);
+        gfx_->fillCircle(badgeCx, badgeCy, badgeR, color);
+
+        uint16_t markColor = contrastTextColor(color);
+        if (showCheck) {
+            gfx_->drawLine(badgeCx - 11, badgeCy, badgeCx - 3, badgeCy + 9, markColor);
+            gfx_->drawLine(badgeCx - 11, badgeCy + 1, badgeCx - 3, badgeCy + 10, markColor);
+            gfx_->drawLine(badgeCx - 3, badgeCy + 9, badgeCx + 13, badgeCy - 10, markColor);
+            gfx_->drawLine(badgeCx - 3, badgeCy + 10, badgeCx + 13, badgeCy - 9, markColor);
+        } else if (showCross) {
+            gfx_->drawLine(badgeCx - 10, badgeCy - 10, badgeCx + 10, badgeCy + 10, markColor);
+            gfx_->drawLine(badgeCx - 10, badgeCy - 9, badgeCx + 10, badgeCy + 11, markColor);
+            gfx_->drawLine(badgeCx - 10, badgeCy + 10, badgeCx + 10, badgeCy - 10, markColor);
+            gfx_->drawLine(badgeCx - 10, badgeCy + 11, badgeCx + 10, badgeCy - 9, markColor);
+        } else if (showRing) {
+            gfx_->drawCircle(badgeCx, badgeCy, 11, markColor);
+            gfx_->drawCircle(badgeCx, badgeCy, 10, markColor);
+        }
+
+        gfx_->setTextSize(2);
+        printCentered(title, 78, color);
+
+        if (subtitle[0] != '\0') {
+            gfx_->setFont(nullptr);
+            gfx_->setTextSize(2);
+            gfx_->setTextColor(textColor_);
+            int16_t x1, y1;
+            uint16_t w, h;
+            gfx_->getTextBounds(subtitle, 0, 0, &x1, &y1, &w, &h);
+            gfx_->setCursor((320 - w) / 2, 122);
+            gfx_->print(subtitle);
+            gfx_->setFont(&FreeSansBold10pt7b);
+        }
+
+        lastCueRendered_ = cue;
+        lastGlowR_ = -1; // erzwingt unten: kein Erase-Versuch fuer den allerersten Ring
+    }
+
+    // Sanfter Puls, wie beim BEREIT-Zustand der App (Sweet-Spot-Glow) -
+    // simpler Sinus auf dem Radius statt einer echten Glow-Textur.
     float pulse = 0.5f + 0.5f * sinf((float)millis() / 220.0f);
     int16_t glowR = badgeR + 3 + (int16_t)(pulse * 3);
+    if (lastGlowR_ >= 0 && lastGlowR_ != glowR) {
+        gfx_->drawCircle(badgeCx, badgeCy, lastGlowR_, BLACK);
+    }
     gfx_->drawCircle(badgeCx, badgeCy, glowR, color);
-    gfx_->fillCircle(badgeCx, badgeCy, badgeR, color);
-
-    uint16_t markColor = contrastTextColor(color);
-    if (showCheck) {
-        gfx_->drawLine(badgeCx - 11, badgeCy, badgeCx - 3, badgeCy + 9, markColor);
-        gfx_->drawLine(badgeCx - 11, badgeCy + 1, badgeCx - 3, badgeCy + 10, markColor);
-        gfx_->drawLine(badgeCx - 3, badgeCy + 9, badgeCx + 13, badgeCy - 10, markColor);
-        gfx_->drawLine(badgeCx - 3, badgeCy + 10, badgeCx + 13, badgeCy - 9, markColor);
-    } else if (showCross) {
-        gfx_->drawLine(badgeCx - 10, badgeCy - 10, badgeCx + 10, badgeCy + 10, markColor);
-        gfx_->drawLine(badgeCx - 10, badgeCy - 9, badgeCx + 10, badgeCy + 11, markColor);
-        gfx_->drawLine(badgeCx - 10, badgeCy + 10, badgeCx + 10, badgeCy - 10, markColor);
-        gfx_->drawLine(badgeCx - 10, badgeCy + 11, badgeCx + 10, badgeCy - 9, markColor);
-    } else if (showRing) {
-        gfx_->drawCircle(badgeCx, badgeCy, 11, markColor);
-        gfx_->drawCircle(badgeCx, badgeCy, 10, markColor);
-    }
-
-    int16_t x1, y1;
-    uint16_t w, h;
-    gfx_->setTextSize(3);
-    gfx_->setTextColor(color);
-    gfx_->getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
-    gfx_->setCursor((320 - w) / 2, 88);
-    gfx_->print(title);
-
-    if (subtitle[0] != '\0') {
-        gfx_->setTextSize(2);
-        gfx_->setTextColor(WHITE);
-        gfx_->getTextBounds(subtitle, 0, 0, &x1, &y1, &w, &h);
-        gfx_->setCursor((320 - w) / 2, 122);
-        gfx_->print(subtitle);
-    }
+    lastGlowR_ = glowR;
 }
 
 void TftDisplay::setActivePlayer(GameKind game, uint16_t color565, const String& name) {
@@ -525,12 +584,13 @@ void TftDisplay::renderPlayerBadge(int16_t x, int16_t y) {
     int16_t ccy = y + r + 1;
 
     gfx_->fillCircle(ccx, ccy, r, activePlayerColor565_);
-    gfx_->drawCircle(ccx, ccy, r, creamColor_);
+    gfx_->drawCircle(ccx, ccy, r, textColor_);
 
     char c = activePlayerName_.length() > 0 ? activePlayerName_[0] : '?';
     if (c >= 'a' && c <= 'z') c -= 32; // Grossbuchstabe, ohne <ctype.h>
     char initial[2] = { c, '\0' };
 
+    gfx_->setFont(nullptr);
     gfx_->setTextSize(1);
     gfx_->setTextColor(contrastTextColor(activePlayerColor565_));
     int16_t tx1, ty1;
@@ -541,16 +601,30 @@ void TftDisplay::renderPlayerBadge(int16_t x, int16_t y) {
 
     int16_t textX = x + 2 * r + 12;
     gfx_->setTextSize(2);
-    gfx_->setTextColor(WHITE);
+    gfx_->setTextColor(textColor_);
     gfx_->setCursor(textX, y);
     gfx_->print(activePlayerName_);
 
     gfx_->setTextSize(1);
-    gfx_->setTextColor(COLOR_MUTED);
+    gfx_->setTextColor(mutedColor_);
     gfx_->setCursor(textX, y + 17);
     gfx_->print("ist dran");
+    gfx_->setFont(&FreeSansBold10pt7b);
 
     renderGameIcon(activeGame_, 300, ccy, 16, activePlayerColor565_);
+}
+
+uint16_t TftDisplay::gameAccentColor(GameKind game) const {
+    switch (game) {
+        case GameKind::Golf:      return gfx_->color565(0x4A, 0xDE, 0x80); // #4ade80
+        case GameKind::Dart:      return gfx_->color565(0xFB, 0x71, 0x85); // #fb7185
+        case GameKind::Blackjack: return gfx_->color565(0xE8, 0xC1, 0x4D); // #e8c14d
+        case GameKind::Tower:     return gfx_->color565(0xC9, 0x9A, 0x5C); // #c99a5c
+        case GameKind::Boxen:     return gfx_->color565(0xA7, 0x8B, 0xFA); // #a78bfa
+        case GameKind::Scale:     return gfx_->color565(0x38, 0xBD, 0xF8); // #38bdf8
+        case GameKind::None:
+        default:                  return accentColor_;
+    }
 }
 
 // Kleine, abstrakte Icons statt Sprites - je Spiel ein simples, sofort
@@ -597,38 +671,82 @@ void TftDisplay::renderGameIcon(GameKind game, int16_t cx, int16_t cy, int16_t s
 
 // "Ball fliegt Richtung Loch" - analog zu GolfBallFlight.tsx im App-Repo:
 // Fairway-Linie + Fahne rechts, Ball fliegt in Endlosschleife eine Parabel.
+//
+// Flacker-Fix: Boden/Fahne/Label sind ueber die gesamte Cue-Dauer statisch
+// und werden nur beim allerersten Frame (awayStaticGame_ wechselt) gezeichnet.
+// Danach wird pro Frame nur der Ball an seiner alten Position schwarz
+// uebermalt, bevor er an der neuen Position neu erscheint - kein
+// fillScreen(BLACK) mehr noetig.
 void TftDisplay::renderAwayGolf() {
     constexpr int16_t groundY = 130;
-    gfx_->drawFastHLine(20, groundY, 280, COLOR_MUTED);
-    gfx_->drawFastVLine(280, groundY - 40, 40, creamColor_);
-    gfx_->fillTriangle(280, groundY - 40, 280, groundY - 28, 300, groundY - 34, zestColor_);
+    constexpr int16_t ballR = 6;
+
+    if (awayStaticGame_ != GameKind::Golf) {
+        gfx_->fillScreen(BLACK);
+        gfx_->drawFastHLine(20, groundY, 280, mutedColor_);
+        gfx_->drawFastVLine(280, groundY - 40, 40, textColor_);
+        gfx_->fillTriangle(280, groundY - 40, 280, groundY - 28, 300, groundY - 34, gameAccentColor(GameKind::Golf));
+
+        gfx_->setFont(nullptr);
+        gfx_->setTextSize(2);
+        int16_t x1, y1;
+        uint16_t w, h;
+        const char* label = "Ball fliegt ...";
+        gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+        gfx_->setTextColor(mutedColor_);
+        gfx_->setCursor((320 - w) / 2, 20);
+        gfx_->print(label);
+        gfx_->setFont(&FreeSansBold10pt7b);
+
+        awayStaticGame_ = GameKind::Golf;
+        prevGolfBallX_ = -1000; // erzwingt unten: kein Erase-Versuch fuer den allerersten Ball
+    }
 
     float t = fmodf((float)millis(), 1400.0f) / 1400.0f; // 0..1, Endlosschleife
     float x = 30.0f + t * 240.0f;
     float y = groundY - sinf(t * PI) * 70.0f; // Parabelbogen
-    gfx_->fillCircle((int16_t)x, (int16_t)y, 6, creamColor_);
+    int16_t bx = (int16_t)x, by = (int16_t)y;
 
-    gfx_->setTextSize(2);
-    gfx_->setTextColor(COLOR_MUTED);
-    int16_t x1, y1;
-    uint16_t w, h;
-    const char* label = "Ball fliegt ...";
-    gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
-    gfx_->setCursor((320 - w) / 2, 20);
-    gfx_->print(label);
+    if (prevGolfBallX_ > -1000) {
+        gfx_->fillCircle(prevGolfBallX_, prevGolfBallY_, ballR, BLACK);
+    }
+    gfx_->fillCircle(bx, by, ballR, textColor_);
+    prevGolfBallX_ = bx;
+    prevGolfBallY_ = by;
 }
 
 // "Pfeil fliegt zur Scheibe" - analog zu DartThrow.tsx: Dartscheibe rechts
 // (konzentrische Ringe + Bullseye), Pfeil fliegt in flacher Kurve heran und
 // richtet sich dabei auf die Scheibe aus (Linie + Pfeilspitze, kein echtes
 // Sprite noetig - die Ausrichtung ergibt sich aus der Blickrichtung).
+//
+// Flacker-Fix wie renderAwayGolf(): Scheibe + Label nur einmal, pro Frame
+// nur die Bounding-Box des alten Pfeils schwarz uebermalen.
 void TftDisplay::renderAwayDart() {
     constexpr int16_t boardCx = 270;
     constexpr int16_t boardCy = 85;
-    gfx_->drawCircle(boardCx, boardCy, 42, COLOR_MUTED);
-    gfx_->drawCircle(boardCx, boardCy, 30, coralColor_);
-    gfx_->drawCircle(boardCx, boardCy, 16, emberColor_);
-    gfx_->fillCircle(boardCx, boardCy, 6, zestColor_);
+
+    if (awayStaticGame_ != GameKind::Dart) {
+        gfx_->fillScreen(BLACK);
+        gfx_->drawCircle(boardCx, boardCy, 42, mutedColor_);
+        gfx_->drawCircle(boardCx, boardCy, 30, dangerColor_);
+        gfx_->drawCircle(boardCx, boardCy, 16, accentColor_);
+        gfx_->fillCircle(boardCx, boardCy, 6, gameAccentColor(GameKind::Dart));
+
+        gfx_->setFont(nullptr);
+        gfx_->setTextSize(2);
+        int16_t x1, y1;
+        uint16_t w, h;
+        const char* label = "Pfeil fliegt ...";
+        gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+        gfx_->setTextColor(mutedColor_);
+        gfx_->setCursor((320 - w) / 2, 20);
+        gfx_->print(label);
+        gfx_->setFont(&FreeSansBold10pt7b);
+
+        awayStaticGame_ = GameKind::Dart;
+        prevDartMinX_ = -1000;
+    }
 
     float t = fmodf((float)millis(), 1100.0f) / 1100.0f; // 0..1, Endlosschleife
     float startX = 30.0f, startY = 100.0f;
@@ -643,32 +761,65 @@ void TftDisplay::renderAwayDart() {
     float angle = atan2f(y2 - y, x2 - x);
     float tipX = x + cosf(angle) * 10.0f, tipY = y + sinf(angle) * 10.0f;
     float tailX = x - cosf(angle) * 10.0f, tailY = y - sinf(angle) * 10.0f;
-
-    gfx_->drawLine((int16_t)tailX, (int16_t)tailY, (int16_t)tipX, (int16_t)tipY, creamColor_);
     float backAngle1 = angle + 2.6f, backAngle2 = angle - 2.6f;
-    gfx_->drawLine((int16_t)tipX, (int16_t)tipY, (int16_t)(tipX + cosf(backAngle1) * 6.0f), (int16_t)(tipY + sinf(backAngle1) * 6.0f), creamColor_);
-    gfx_->drawLine((int16_t)tipX, (int16_t)tipY, (int16_t)(tipX + cosf(backAngle2) * 6.0f), (int16_t)(tipY + sinf(backAngle2) * 6.0f), creamColor_);
+    float back1X = tipX + cosf(backAngle1) * 6.0f, back1Y = tipY + sinf(backAngle1) * 6.0f;
+    float back2X = tipX + cosf(backAngle2) * 6.0f, back2Y = tipY + sinf(backAngle2) * 6.0f;
 
-    gfx_->setTextSize(2);
-    gfx_->setTextColor(COLOR_MUTED);
-    int16_t x1, y1;
-    uint16_t w, h;
-    const char* label = "Pfeil fliegt ...";
-    gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
-    gfx_->setCursor((320 - w) / 2, 20);
-    gfx_->print(label);
+    // Bounding-Box aus allen vier Punkten des Pfeils (Schwanz/Spitze/zwei
+    // Feder-Striche) plus 2px Rand - deckt die alte Pfeil-Zeichnung sicher
+    // komplett ab, ohne die (weiter rechts liegende) Dartscheibe zu beruehren.
+    int16_t minX = (int16_t)fminf(fminf(tailX, tipX), fminf(back1X, back2X)) - 2;
+    int16_t maxX = (int16_t)fmaxf(fmaxf(tailX, tipX), fmaxf(back1X, back2X)) + 2;
+    int16_t minY = (int16_t)fminf(fminf(tailY, tipY), fminf(back1Y, back2Y)) - 2;
+    int16_t maxY = (int16_t)fmaxf(fmaxf(tailY, tipY), fmaxf(back1Y, back2Y)) + 2;
+
+    if (prevDartMinX_ > -1000) {
+        gfx_->fillRect(prevDartMinX_, prevDartMinY_, prevDartMaxX_ - prevDartMinX_, prevDartMaxY_ - prevDartMinY_, BLACK);
+    }
+
+    gfx_->drawLine((int16_t)tailX, (int16_t)tailY, (int16_t)tipX, (int16_t)tipY, textColor_);
+    gfx_->drawLine((int16_t)tipX, (int16_t)tipY, (int16_t)back1X, (int16_t)back1Y, textColor_);
+    gfx_->drawLine((int16_t)tipX, (int16_t)tipY, (int16_t)back2X, (int16_t)back2Y, textColor_);
+
+    prevDartMinX_ = minX;
+    prevDartMinY_ = minY;
+    prevDartMaxX_ = maxX;
+    prevDartMaxY_ = maxY;
 }
 
 // "Karte wird gezogen" - analog zu BlackjackDraw.tsx: Stapel links (still),
 // eine Karte fliegt zur Mitte und "flippt" dabei um (hier simuliert durch
 // horizontales Stauchen auf eine duenne Linie in der Flugmitte, statt
-// echter 3D-Rotation - danach zeigt die Karte ihre "Vorderseite" mit Pik-
+// echter 3D-Rotation - danach zeigt die Karte ihre "Vorderseite" mit
 // Symbol statt der leeren Rueckseite).
+//
+// Flacker-Fix wie renderAwayGolf(): Stapel + Label nur einmal, pro Frame
+// nur das alte Karten-Rechteck (inkl. 3px Rand fuer die Rundung) schwarz
+// uebermalen - Y/Hoehe der fliegenden Karte sind konstant, nur X/Breite
+// aendern sich, deshalb reicht ein simples fillRect als Radiergummi.
 void TftDisplay::renderAwayBlackjack() {
     constexpr int16_t cardW = 40, cardH = 56;
     constexpr int16_t stackX = 40, cardY = 57;
-    gfx_->drawRoundRect(stackX, cardY, cardW, cardH, 6, creamColor_);
-    gfx_->drawRoundRect(stackX + 3, cardY - 3, cardW, cardH, 6, COLOR_MUTED);
+
+    if (awayStaticGame_ != GameKind::Blackjack) {
+        gfx_->fillScreen(BLACK);
+        gfx_->drawRoundRect(stackX, cardY, cardW, cardH, 6, textColor_);
+        gfx_->drawRoundRect(stackX + 3, cardY - 3, cardW, cardH, 6, mutedColor_);
+
+        gfx_->setFont(nullptr);
+        gfx_->setTextSize(2);
+        int16_t x1, y1;
+        uint16_t w, h;
+        const char* label = "Karte wird gezogen ...";
+        gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+        gfx_->setTextColor(mutedColor_);
+        gfx_->setCursor((320 - w) / 2, 20);
+        gfx_->print(label);
+        gfx_->setFont(&FreeSansBold10pt7b);
+
+        awayStaticGame_ = GameKind::Blackjack;
+        prevCardLeft_ = -1000;
+    }
 
     float t = fmodf((float)millis(), 1300.0f) / 1300.0f; // 0..1, Endlosschleife
     constexpr int16_t targetX = 160 - cardW / 2;
@@ -680,36 +831,57 @@ void TftDisplay::renderAwayBlackjack() {
 
     int16_t cx = (int16_t)x + cardW / 2;
     int16_t left = cx - w / 2;
+
+    if (prevCardLeft_ > -1000) {
+        gfx_->fillRect(prevCardLeft_ - 2, cardY - 2, prevCardW_ + 4, cardH + 4, BLACK);
+    }
+
+    uint16_t gameColor = gameAccentColor(GameKind::Blackjack);
     if (showFront) {
-        gfx_->fillRoundRect(left, cardY, w, cardH, 5, creamColor_);
+        gfx_->fillRoundRect(left, cardY, w, cardH, 5, textColor_);
         if (w > 14) {
-            gfx_->fillTriangle(cx, cardY + 10, cx - 8, cardY + 30, cx + 8, cardY + 30, coralColor_);
-            gfx_->fillRect(cx - 2, cardY + 28, 4, 14, coralColor_);
+            gfx_->fillTriangle(cx, cardY + 10, cx - 8, cardY + 30, cx + 8, cardY + 30, dangerColor_);
+            gfx_->fillRect(cx - 2, cardY + 28, 4, 14, dangerColor_);
         }
     } else {
-        gfx_->fillRoundRect(left, cardY, w, cardH, 5, emberColor_);
+        gfx_->fillRoundRect(left, cardY, w, cardH, 5, gameColor);
     }
-    gfx_->drawRoundRect(left, cardY, w, cardH, 5, creamColor_);
+    gfx_->drawRoundRect(left, cardY, w, cardH, 5, textColor_);
 
-    gfx_->setTextSize(2);
-    gfx_->setTextColor(COLOR_MUTED);
-    int16_t x1, y1;
-    uint16_t th;
-    uint16_t tw;
-    const char* label = "Karte wird gezogen ...";
-    gfx_->getTextBounds(label, 0, 0, &x1, &y1, &tw, &th);
-    gfx_->setCursor((320 - tw) / 2, 20);
-    gfx_->print(label);
+    prevCardLeft_ = left;
+    prevCardW_ = w;
 }
 
 // "Block wird gezogen" - analog zu TowerPull.tsx: Rest-Turm steht mittig,
 // ein Block wird seitlich herausgezogen, wandert dann nach oben auf den
 // Stapel. Endlosschleife mit vier Phasen (raus, Pause, hoch, Pause) wie im
 // App-Original (times: [0, 0.35, 0.65, 1]).
+//
+// Flacker-Fix wie renderAwayGolf(): Rest-Turm + Label nur einmal, pro Frame
+// nur das alte Block-Rechteck (Groesse konstant, nur x/y aendern sich)
+// schwarz uebermalen.
 void TftDisplay::renderAwayTower() {
     constexpr int16_t towerCx = 160, blockW = 70, blockH = 14, baseY = 140;
-    for (int8_t i = 0; i < 4; i++) {
-        gfx_->drawRoundRect(towerCx - blockW / 2, baseY - (i + 1) * (blockH + 2), blockW, blockH, 3, creamColor_);
+
+    if (awayStaticGame_ != GameKind::Tower) {
+        gfx_->fillScreen(BLACK);
+        for (int8_t i = 0; i < 4; i++) {
+            gfx_->drawRoundRect(towerCx - blockW / 2, baseY - (i + 1) * (blockH + 2), blockW, blockH, 3, textColor_);
+        }
+
+        gfx_->setFont(nullptr);
+        gfx_->setTextSize(2);
+        int16_t x1, y1;
+        uint16_t w, h;
+        const char* label = "Block wird gezogen ...";
+        gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+        gfx_->setTextColor(mutedColor_);
+        gfx_->setCursor((320 - w) / 2, 20);
+        gfx_->print(label);
+        gfx_->setFont(&FreeSansBold10pt7b);
+
+        awayStaticGame_ = GameKind::Tower;
+        prevTowerX_ = -1000;
     }
 
     float t = fmodf((float)millis(), 1600.0f) / 1600.0f; // 0..1, Endlosschleife
@@ -726,17 +898,14 @@ void TftDisplay::renderAwayTower() {
         pulledX = (int16_t)((towerCx - blockW / 2 - 90) + p * 90.0f);
         blockY = (baseY - 2 * (blockH + 2)) - (int16_t)(p * 4.0f * (blockH + 2));
     }
-    gfx_->fillRoundRect(pulledX, blockY, blockW, blockH, 3, zestColor_);
-    gfx_->drawRoundRect(pulledX, blockY, blockW, blockH, 3, creamColor_);
 
-    gfx_->setTextSize(2);
-    gfx_->setTextColor(COLOR_MUTED);
-    int16_t x1, y1;
-    uint16_t w, h;
-    const char* label = "Block wird gezogen ...";
-    gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
-    gfx_->setCursor((320 - w) / 2, 20);
-    gfx_->print(label);
+    if (prevTowerX_ > -1000) {
+        gfx_->fillRect(prevTowerX_, prevTowerY_, blockW, blockH, BLACK);
+    }
+    gfx_->fillRoundRect(pulledX, blockY, blockW, blockH, 3, gameAccentColor(GameKind::Tower));
+    gfx_->drawRoundRect(pulledX, blockY, blockW, blockH, 3, textColor_);
+    prevTowerX_ = pulledX;
+    prevTowerY_ = blockY;
 }
 
 // "Boxhandschuh trifft Sack" - analog zu BoxenAwayMoment.tsx: Boxsack haengt
@@ -745,45 +914,74 @@ void TftDisplay::renderAwayTower() {
 // Spielen - passt besser zu einem Jab). Der Sack wackelt staerker, je naeher
 // der Handschuh gerade dran ist - kein echter Treffer-Trigger noetig, das
 // Wackeln folgt einfach der Ping-Pong-Position selbst.
+//
+// Flacker-Fix wie renderAwayGolf(): nur das Label ist wirklich statisch -
+// Sack UND Handschuh bewegen sich (der Sack nur minimal, das Wackeln),
+// deshalb bekommen beide ihre eigene Dirty-Rect-Radierung statt eines
+// fillScreen(BLACK).
 void TftDisplay::renderAwayBoxen() {
     constexpr int16_t bagTopY = 55;
     constexpr int16_t bagW = 32, bagH = 55;
     constexpr int16_t bagCx = 270;
+
+    if (awayStaticGame_ != GameKind::Boxen) {
+        gfx_->fillScreen(BLACK);
+
+        gfx_->setFont(nullptr);
+        gfx_->setTextSize(2);
+        int16_t x1, y1;
+        uint16_t w, h;
+        const char* label = "Schlag wird gesetzt ...";
+        gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+        gfx_->setTextColor(mutedColor_);
+        gfx_->setCursor((320 - w) / 2, 20);
+        gfx_->print(label);
+        gfx_->setFont(&FreeSansBold10pt7b);
+
+        awayStaticGame_ = GameKind::Boxen;
+        prevBagX_ = -1000;
+        prevGloveX_ = -1000;
+    }
 
     float t = fmodf((float)millis(), 1300.0f) / 1300.0f; // 0..1, Endlosschleife
     float pp = t < 0.5f ? t * 2.0f : (1.0f - t) * 2.0f;   // 0 -> 1 -> 0 (hin und zurueck)
     float wobble = sinf((float)millis() / 120.0f) * 2.0f * pp;
 
     int16_t bagX = bagCx + (int16_t)wobble;
-    gfx_->drawFastVLine(bagX, 20, bagTopY - 20, creamColor_);
-    gfx_->fillRoundRect(bagX - bagW / 2, bagTopY, bagW, bagH, 10, coralColor_);
+    if (prevBagX_ > -1000) {
+        gfx_->fillRect(prevBagX_ - bagW / 2 - 1, 20, bagW + 2, (bagTopY - 20) + bagH + 5, BLACK);
+    }
+    gfx_->drawFastVLine(bagX, 20, bagTopY - 20, textColor_);
+    gfx_->fillRoundRect(bagX - bagW / 2, bagTopY, bagW, bagH, 10, mutedColor_);
+    prevBagX_ = bagX;
 
     float gloveX = 30.0f + pp * (float)(bagX - bagW / 2 - 30 - 14);
     int16_t gloveY = bagTopY + bagH / 2;
-    gfx_->fillCircle((int16_t)gloveX, gloveY, 10, emberColor_);
-    gfx_->fillRoundRect((int16_t)gloveX + 6, gloveY - 7, 9, 14, 3, emberColor_);
-
-    gfx_->setTextSize(2);
-    gfx_->setTextColor(COLOR_MUTED);
-    int16_t x1, y1;
-    uint16_t w, h;
-    const char* label = "Schlag wird gesetzt ...";
-    gfx_->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
-    gfx_->setCursor((320 - w) / 2, 20);
-    gfx_->print(label);
+    int16_t gx = (int16_t)gloveX;
+    if (prevGloveX_ > -1000) {
+        gfx_->fillRect(prevGloveX_ - 11, prevGloveY_ - 12, 27, 24, BLACK);
+    }
+    uint16_t gloveColor = gameAccentColor(GameKind::Boxen);
+    gfx_->fillCircle(gx, gloveY, 10, gloveColor);
+    gfx_->fillRoundRect(gx + 6, gloveY - 7, 9, 14, 3, gloveColor);
+    prevGloveX_ = gx;
+    prevGloveY_ = gloveY;
 }
 
 void TftDisplay::showMessage(const String& title, const String& body) {
     gfx_->fillScreen(BLACK);
 
-    gfx_->setTextColor(WHITE);
+    gfx_->setFont(nullptr);
+    gfx_->setTextColor(textColor_);
     gfx_->setTextSize(2);
     gfx_->setCursor(8, 8);
     gfx_->print(title);
 
     gfx_->setTextSize(1);
+    gfx_->setTextColor(mutedColor_);
     gfx_->setCursor(8, 45);
     gfx_->print(body);
+    gfx_->setFont(&FreeSansBold10pt7b);
 
     // Naechster update()-Aufruf soll sofort neu zeichnen statt auf den
     // Drossel-Timer zu warten.
