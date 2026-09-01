@@ -14,8 +14,8 @@
 // Lokaler Anzeige-Zustand, wenn WEDER ein RemoteCue laeuft NOCH ein Spieler
 // am Zug ist (siehe hasActivePlayer_) - die Waage ist "zwischen Spielen".
 // Ersetzt die bisherige reine Live-Gewichtsanzeige (war nur zum Debuggen
-// gedacht, siehe ROADMAP.md Punkt 1) durch die Geraete-Spielauswahl: Taste 1
-// kurz schaltet durch die Spieleliste, Taste 2 kurz bestaetigt.
+// gedacht) durch die Geraete-Spielauswahl: Taste 1 kurz schaltet durch die
+// Spieleliste, Taste 2 kurz bestaetigt.
 enum class LocalScreen {
     GamePicker,     // "<Icon> <Name>", Taste 1/2-Hinweis
     GameConfirmed,  // "<Name> ausgewaehlt - jetzt in der App oeffnen"
@@ -59,9 +59,9 @@ public:
     // Zeigt je nach Zustand: RemoteCue (laueft ein Spiel-Ritual) > Spieler-
     // Warteschirm (Spieler am Zug, aber gerade kein Cue) > Geraete-
     // Spielauswahl (Ruhezustand) - siehe LocalScreen. Kein Live-Gewicht
-    // mehr auf dem Display (war nur Debug-Hilfsmittel, siehe ROADMAP.md
-    // Punkt 1) - fuer den seltenen Fall, dass der Rohwert doch mal
-    // gebraucht wird, bleibt er ueber Serial (main.cpp) einsehbar.
+    // mehr auf dem Display (war nur Debug-Hilfsmittel) - fuer den seltenen
+    // Fall, dass der Rohwert doch mal gebraucht wird, bleibt er ueber
+    // Serial (main.cpp) einsehbar.
     void update(bool hx711Connected, bool bleConnected);
 
     // Von main.cpp bei Taste 1 kurz (Geraete-Spielauswahl) aufgerufen -
@@ -73,8 +73,8 @@ public:
 
     // Von main.cpp bei Taste 2 kurz aufgerufen - bestaetigt die aktuell
     // hervorgehobene Auswahl (zeigt "X ausgewaehlt - jetzt in der App
-    // oeffnen"). Kein automatisches Umschalten der App (siehe ROADMAP.md
-    // Punkt 1, "App-Sync" bewusst fuers Erste zurueckgestellt) - reine
+    // oeffnen"). Kein automatisches Umschalten der App (siehe ROADMAP.md,
+    // "App-Sync: Geraete-Spielauswahl schaltet die App mit um") - reine
     // lokale Anzeige, die Bestaetigung in der App passiert weiter von Hand.
     void pickerConfirm();
 
@@ -173,7 +173,8 @@ private:
     // Geraete-Spielauswahl (siehe pickerNext()/pickerConfirm()) - Index in
     // PICKER_GAMES (TftDisplay.cpp), Reihenfolge/Namen bewusst 1:1 synchron
     // zu GAME_REGISTRY in gameRegistry.ts (App-Repo) gepflegt statt per BLE
-    // uebertragen (siehe ROADMAP.md Punkt 1, "App-Sync" zurueckgestellt).
+    // uebertragen (siehe ROADMAP.md, "App-Sync: Geraete-Spielauswahl
+    // schaltet die App mit um").
     LocalScreen localScreen_ = LocalScreen::GamePicker;
     uint8_t pickerIndex_ = 0;
 
