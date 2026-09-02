@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <esp_sleep.h>
+#include <driver/gpio.h>
 #include <driver/rtc_io.h>
 
 #include "BoardConfig.h"
@@ -82,10 +83,15 @@ void onSleepLongPress() {
 
 // Versetzt die Waage in Deep Sleep (~wenige µA statt 60-150+ mA aktiv).
 // Aufwachen NUR ueber Pins::WAKEUP_BUTTON (Board-Profil): auf der grossen
-// Waage Taste 2 (GPIO14), auf der Light der einzige Taster (GPIO33). Beide
+// Waage Taste 2 (GPIO14), auf der Light der einzige Taster (GPIO5). Beide
 // sind bewusst KEIN Strapping-Pin - waere so einer beim Aufwach-Boot noch
 // gedrueckt, koennte der Chip statt der Firmware in den Flash-Download-Modus
-// starten (genau deshalb scheiden GPIO0 hier wie dort aus).
+// starten (deshalb scheiden GPIO0 am S3 und GPIO2/8/9 am C3 aus).
+//
+// Der Weckmechanismus selbst unterscheidet sich: ext0 gibt es nur auf
+// ESP32/ESP32-S3, der C3 der Light kann stattdessen ueber
+// esp_deep_sleep_enable_gpio_wakeup() geweckt werden (beides nur mit
+// RTC-faehigen Pins, siehe Board-Profile).
 // Nach dem Aufwachen laeuft die komplette Firmware (setup()) neu durch -
 // es gibt keinen speziellen "Resume"-Pfad, das ist bei ESP32-Deep-Sleep
 // so vorgesehen.
@@ -105,9 +111,17 @@ void enterDeepSleep() {
     digitalWrite(Pins::POWER_ON, LOW); // Peripherie (Display etc.) stromlos schalten
 #endif
 
+#if MASSARBEIT_WAKEUP_USES_EXT0
     rtc_gpio_pullup_en((gpio_num_t)Pins::WAKEUP_BUTTON);
     rtc_gpio_pulldown_dis((gpio_num_t)Pins::WAKEUP_BUTTON);
     esp_sleep_enable_ext0_wakeup((gpio_num_t)Pins::WAKEUP_BUTTON, 0); // LOW = Taste gedrueckt
+#else
+    // Der C3 hat keinen eigenen RTCIO-Mux, die rtc_gpio_*-Funktionen gibt es
+    // dort gar nicht - Pullup/Pulldown laufen ueber den normalen GPIO-Treiber.
+    gpio_pullup_en((gpio_num_t)Pins::WAKEUP_BUTTON);
+    gpio_pulldown_dis((gpio_num_t)Pins::WAKEUP_BUTTON);
+    esp_deep_sleep_enable_gpio_wakeup(BIT(Pins::WAKEUP_BUTTON), ESP_GPIO_WAKEUP_GPIO_LOW);
+#endif
 
     esp_deep_sleep_start();
     // Wird nie erreicht.
@@ -174,8 +188,10 @@ void setup() {
     Serial.printf("Chip: %s rev %d, Free heap: %u bytes\n",
                    ESP.getChipModel(), ESP.getChipRevision(), ESP.getFreeHeap());
 
+    // Beide moeglichen Ursachen pruefen, statt sie per #if auseinanderzu-
+    // halten: ext0 meldet der S3, ESP_SLEEP_WAKEUP_GPIO der C3 der Light.
     esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
-    bool wokeFromSleep = wakeupCause == ESP_SLEEP_WAKEUP_EXT0;
+    bool wokeFromSleep = wakeupCause == ESP_SLEEP_WAKEUP_EXT0 || wakeupCause == ESP_SLEEP_WAKEUP_GPIO;
     if (wokeFromSleep) {
         Serial.println("[Power] Aufgewacht aus Deep Sleep (Aufweck-Taster).");
     }

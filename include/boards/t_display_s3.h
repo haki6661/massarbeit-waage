@@ -25,6 +25,10 @@
 #define MASSARBEIT_HAS_POWER_ON    1
 #define MASSARBEIT_HAS_DEV_OTA     1
 
+// Der S3 kann per ext0 aus dem Deep Sleep geweckt werden (der C3 der Light
+// nicht, siehe dortiges Profil).
+#define MASSARBEIT_WAKEUP_USES_EXT0 1
+
 // Spannungsteiler vor dem Batterie-ADC (Faktor 2), siehe LilyGOs
 // GetBatteryVoltage-Beispiel.
 #define MASSARBEIT_BATTERY_DIVIDER 2

@@ -11,7 +11,7 @@ Geraet. Deshalb macht das hier ein Skript, das immer alle vier Werte
 Aufruf (aus dem Repo-Wurzelverzeichnis):
 
     python scripts/release.py               # beide Varianten
-    python scripts/release.py light-t7      # nur die Light
+    python scripts/release.py light-c3      # nur die Light
     python scripts/release.py --no-build    # nur Manifest aus vorhandenen .bin
 
 Die Version kommt aus FIRMWARE_VERSION in include/Config.h - sie wird NICHT
@@ -44,10 +44,10 @@ VARIANTS = {
         "name": "Massarbeit Waage",
         "bin": "firmware/t-display-s3.bin",
     },
-    "light-t7": {
-        "env": "massarbeit-light-t7",
+    "light-c3": {
+        "env": "massarbeit-light-c3",
         "name": "Massarbeit Waage Light",
-        "bin": "firmware/light-t7.bin",
+        "bin": "firmware/light-c3.bin",
     },
 }
 
@@ -132,6 +132,14 @@ def main() -> None:
     if MANIFEST.exists():
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     variant_entries = manifest.get("variants", {})
+
+    # ... aber nur fuer Varianten, die es noch gibt. VARIANTS oben ist die
+    # Wahrheit darueber, welche Modelle existieren; ein Eintrag fuer ein
+    # zurueckgezogenes Modell wuerde sonst ewig im Manifest stehen bleiben und
+    # auf eine .bin zeigen, die im Repo laengst geloescht ist.
+    for retired in [key for key in variant_entries if key not in VARIANTS]:
+        print(f"[release] Entferne Manifest-Eintrag fuer unbekannte Variante '{retired}'.")
+        variant_entries.pop(retired)
 
     for variant in selected:
         variant_entries[variant] = publish(variant, version, do_build=not args.no_build)
