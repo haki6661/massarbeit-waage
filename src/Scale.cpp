@@ -12,7 +12,15 @@ bool Scale::begin() {
     preferences.end();
     Serial.printf("[Scale] Kalibrierfaktor geladen: %.6f\n", calibrationFactor);
 
-    hx711.begin(dataPin, clockPin);
+    // doReset=false: die Default-Implementierung der Library ruft sonst intern
+    // reset() -> read() auf, was blockierend auf eine LOW-Flanke an DOUT
+    // wartet. Ohne angeschlossenen HX711 (DOUT haengt per Pullup dauerhaft
+    // HIGH) haengt sich das Geraet damit VOR dem eigentlichen, zeitlich
+    // begrenzten Verbindungstest weiter unten fuer immer auf - kein Crash,
+    // kein Watchdog-Reset (yield() in der Library-Schleife fuettert ihn
+    // brav weiter), einfach stiller Stillstand. Reset/Tara macht
+    // Scale::begin() ohnehin selbst (siehe unten), sobald der Test erfolgreich war.
+    hx711.begin(dataPin, clockPin, false, false);
     hx711.set_scale(calibrationFactor);
 
     Serial.println("[Scale] Teste HX711-Verbindung...");
