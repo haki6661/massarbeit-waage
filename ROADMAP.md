@@ -135,8 +135,8 @@ sortiert zurückgibt - und jedes Spiel muss das beantworten können:
   Zwischenstands anbieten oder verwerfen?
 - Zeigt die Waage bei der Siegerehrung mit? Dafür bräuchte es einen neuen
   `RemoteCue` und eine Treppchen-Animation im Display-Code - und die
-  Light-Variante (siehe unten) hat kein Display, könnte den Moment
-  höchstens über die Status-LED andeuten.
+  Light-Variante hat kein Display, könnte den Moment höchstens über ihre
+  Status-LED andeuten.
 
 **Zur Siegerehrung selbst:** Treppchen mit Platz 1/2/3, die Spieler in
 ihren Lobby-Farben. Stilistisch an den bestehenden Reveal-Ritualen
@@ -204,236 +204,77 @@ zurückgestellt und nicht mitgemacht.
   Stellen eingetragen werden. Mit einer Gerät->App-Richtung im Protokoll
   wäre auch der umgekehrte Weg denkbar (App schickt die Spieleliste beim
   Verbinden ans Gerät), dann fiele die doppelte Pflege weg.
-- Gilt nur für die große Waage - die Light-Variante (siehe unten) hat kein
-  Display und damit keine Geräte-Auswahl.
+- Gilt nur für die große Waage - die Light-Variante hat kein Display und
+  damit keine Geräte-Auswahl.
 
 **Status:** Nicht begonnen.
 
-## 6. Zweite Gerätevariante: "Maßarbeit Waage Light" (ESP32-C3, ohne Display)
+## 6. Waage Light: hörbare Rückmeldung und Kalibrierung ohne Display
 
-**Idee:** Eine abgespeckte, deutlich billigere Waage auf einem kleinen
-ESP32-C3-Board **ohne TFT**. Sie wiegt und funkt, sonst nichts - das
-gesamte Spielgeschehen läuft ohnehin auf dem Handy. Die App erkennt beim
-Verbinden selbst, welches Modell dranhängt, und verhält sich entsprechend.
+**Idee:** Zwei offene Enden aus dem Bau der Light (siehe `LedStatusUi.cpp`
+und `CalibrationRoutine.h`), die bewusst erst einmal minimal gelöst wurden.
 
-**Warum:** Das TFT ist am aktuellen Gerät der größte Posten bei Preis,
-Stromverbrauch und Bootzeit. Für Runden, in denen sowieso alle aufs Handy
-schauen, reicht ein Board für ~3 EUR. Nebeneffekt: mehrere Light-Waagen
-gleichzeitig werden bezahlbar (mehrere Tische/Gruppen).
-
-### Grundsatzentscheidung: EINE Software, nicht zwei
-
-**Entschieden:** Eine gemeinsame Firmware-Codebasis mit zwei Build-Targets
-und **eine** App mit Laufzeit-Erkennung. Ausdrücklich KEIN zweites
-Firmware-Projekt.
-
-Der Punkt, der die Frage entscheidet: ESP32-S3 und ESP32-C3 sind
-verschiedene Prozessor-Architekturen (Xtensa LX7 vs. RISC-V). Eine einzelne
-`.bin` kann physisch nicht auf beiden starten. "Firmware erkennt selbst,
-worauf sie läuft" gibt es auf Binary-Ebene also gar nicht, egal wie der Code
-geschrieben ist. Die echte Wahl ist: *eine Codebasis, aus der zwei Binaries
-fallen* vs. *zwei getrennt gepflegte Projekte*.
-
-Für eine Codebasis spricht der Anteil des geteilten Codes:
-
-| Geteilt (unverändert für beide) | Variantenspezifisch |
-|---|---|
-| `Scale` (HX711, Smart-Filter, Auto-Zero, Schock-Korrektur) | Pinbelegung |
-| komplettes BLE-Protokoll inkl. aller Kommandos | Anzeige: TFT vs. Status-LED |
-| `OtaUpdater` (Firmware-Update per BLE) | Akkumessung (ja/nein) |
-| `CalibrationRoutine` + NVS-Speicherung | Tastenanzahl (2 vs. 1) |
-| Deep Sleep / Auto-Sleep-Logik | Deep-Sleep-Aufweckpin (ext0 vs. GPIO-Wakeup) |
-
-Das sind grob 90% geteilter Code gegen eine Handvoll Pins und die Anzeige.
-Zwei Repos hieße: jeder Filter-Fix, jede neue BLE-Kommandonummer, jeder
-OTA-Fix doppelt - und genau daraus entstehen Firmware-Stände, die nicht mehr
-zum selben App-Protokoll passen. Der Preis der einen Codebasis ist ein
-Board-Profil-Header, eine `DeviceUi`-Abstraktion und ein paar `#if` in
-`main.cpp`. Deutlich billiger.
-
-Auf **App-Seite** geht Laufzeit-Erkennung dagegen wirklich (eine App, ein
-Deployment): die Waage meldet beim Verbinden Modell + Fähigkeiten, die UI
-passt sich an. Die Spiel-Kommandos `0x10`-`0x15` bleiben für beide Varianten
-identisch - die Light rendert sie eben als LED-Farbe statt als
-Vollbild-Animation. Die App muss gar nicht wissen, *wie* das Gerät sie
-darstellt.
-
-### Hardware Light
-
-Zielboard: beliebiges kleines ESP32-C3 mit nativem USB, in der Praxis
-"ESP32-C3 SuperMini" (~3 EUR, 22x18mm). PlatformIO-Boardprofil dafür:
-`esp32-c3-devkitm-1` (gleicher Chip, 4MB Flash, Standard-Partitionstabelle
-mit zwei OTA-Slots - nötig fürs Firmware-Update per BLE).
-
-| Zweck | GPIO | Anmerkung |
-|---|---|---|
-| HX711 DOUT / SCK | 6 / 7 | frei, kein Strapping, keine USB-/UART-Funktion |
-| Taster (gegen GND) | 5 | interner Pullup, kein Widerstand nötig |
-| Status-LED | 8 | auf dem SuperMini onboard, gegen 3V3 verschaltet -> LOW = an |
-| Batterie-ADC (optional) | 1 | nur mit nachgerüstetem Spannungsteiler, ADC1 |
-
-Drei Randbedingungen des C3, die die Pinwahl bestimmen - **nicht**
-umsortieren, ohne sie zu prüfen:
-
-- **GPIO2/8/9 sind Strapping-Pins.** Taugen nicht als Taster: ein beim
-  Einschalten gedrückter Taster könnte den Chip in den Flash-Download-Modus
-  booten lassen (gleiches Problem wie GPIO0 am S3, siehe `Buttons.h`).
-- **Nur GPIO0-5 sind RTC-fähig**, und nur die können aus dem Deep Sleep
-  aufwecken -> der Taster MUSS auf GPIO0-5 liegen.
-- **GPIO18/19 = nativer USB (D-/D+), GPIO20/21 = UART0.** Beide freilassen,
-  sonst gehen Flashen bzw. Serial-Monitor kaputt.
-
-Kein Akku-Spannungsteiler auf einem nackten C3-Board -> Akkustand ist nicht
-messbar, `Battery::readPercent()` liefert `-1` -> `0xFF` über BLE -> die App
-blendet die Anzeige aus (statt eine Zahl zu raten). Wer 2x 100k von BAT+
-nach GND lötet (Mitte an GPIO1), setzt das Fähigkeits-Makro auf 1, der Rest
-läuft unverändert.
-
-### Umbau Firmware (Repo `massarbeit-waage`)
-
-1. **`platformio.ini`:** gemeinsames `[env]` (platform, framework,
-   HX711/NimBLE/OneButton, Monitor), darüber zwei Targets:
-   `t-display-s3` (+ `-ota`) und `massarbeit-light-c3`. Unterschiede:
-   `board`, `-DMASSARBEIT_VARIANT_PRO` bzw. `-DMASSARBEIT_VARIANT_LIGHT`,
-   `Arduino_GFX` + `board_build.filesystem = spiffs` nur beim S3, und
-   `build_src_filter`, damit `TftDisplay.cpp` bzw. `LedStatusUi.cpp` je
-   Target aus dem Build fliegen (PlatformIO kompiliert sonst immer alles in
-   `src/`).
-2. **`include/BoardConfig.h` wird zum Dispatcher**, die eigentlichen Pins
-   ziehen um nach `include/boards/t_display_s3.h` und
-   `include/boards/light_c3.h`. Jede Datei bindet weiter nur
-   `BoardConfig.h` ein und muss nichts über Varianten wissen. Ein
-   Board-Profil definiert außer den Pins einen Fähigkeits-Steckbrief:
-   `MASSARBEIT_MODEL_ID` / `_MODEL_NAME` / `_HAS_TFT` / `_HAS_STATUS_LED` /
-   `_STATUS_LED_RGB` / `_HAS_BATTERY` / `_BUTTON_COUNT`. Fehlt die
-   Variantenauswahl, `#error` statt stiller Fehlbau.
-3. **`DeviceUi` statt direktem `TftDisplay`:** die Enums (`RemoteCue`,
-   `GameKind`, `LocalScreen`) wandern in ein eigenes `DeviceUiTypes.h`,
-   ein `DeviceUi.h` wählt per `using DeviceUi = TftDisplay;` bzw.
-   `= LedStatusUi;` aus. Bewusst Compile-Zeit-Typedef statt virtueller
-   Basisklasse: kein vtable-Overhead, und `TftDisplay` muss dafür nicht
-   angefasst werden. `BleWeightService` und `CalibrationRoutine` nehmen
-   dann `DeviceUi&` statt `TftDisplay&`.
-   Gemeinsame Methodenoberfläche: `begin()`, `update(hx711Ok, bleOk)`,
-   `showMessage()`, `runBootSequence(stepInit)`, `setRemoteCue()`,
-   `setActivePlayer()`, `clearActivePlayer()`, `pickerNext()`,
-   `pickerConfirm()`, `color565FromRgb()`.
-   `TftDisplay::playBootSprite()` bleibt unter diesem Namen bestehen (die
-   ganze Sprite-Doku verweist darauf) und wird nur von einem dünnen
-   `runBootSequence()` aufgerufen - die Light hat keine Sprites, aber
-   dieselbe Aufrufstelle in `main.cpp`.
-4. **Neu: `src/LedStatusUi.h/.cpp`** - dieselbe Oberfläche, aber eine
-   einzelne Status-LED + Serial-Ausgabe statt Bildschirm. Zustand ->
-   Signal (nicht-blockierend über `millis()`, Vorschlag):
-   Boot = pulsierend / kein BLE = langsames Orange-Blinken / verbunden im
-   Leerlauf = grüner Herzschlag alle 3s / HX711-Fehler = schnelles Rot /
-   `Ready` = grünes Pulsieren / `Away` = Spielfarbe im Lauflicht /
-   `ResultPerfect|Close|Miss` = 2s Grün/Orange/Rot / Spieler am Zug =
-   Spielerfarbe gedimmt.
-   RGB-LED (WS2812) über das im Arduino-Core eingebaute `neopixelWrite()` -
-   **keine zusätzliche Library nötig**. Bei einfarbiger LED
-   (`MASSARBEIT_STATUS_LED_RGB 0`, SuperMini) wird jede Farbe stattdessen
-   auf ein eigenes Blinkmuster abgebildet, damit die Zustände trotzdem
-   unterscheidbar bleiben.
-5. **Bedienung mit nur einem Taster** (`Buttons.h` bekommt
-   `#if MASSARBEIT_BUTTON_COUNT >= 2`): kurz = Tara, lang (2s) = Deep Sleep,
-   Doppelklick = Kalibrierroutine. Die Geräte-Spielauswahl entfällt
-   ersatzlos - ohne Display gibt es nichts auszuwählen (siehe auch
-   "App-Sync: Geräte-Spielauswahl schaltet die App mit um" weiter oben).
-6. **Deep Sleep:** der C3 kennt **kein `ext0`**. Statt
-   `esp_sleep_enable_ext0_wakeup()` dort
-   `esp_deep_sleep_enable_gpio_wakeup(BIT(pin), ESP_GPIO_WAKEUP_GPIO_LOW)`,
-   und die Aufwach-Ursache ist `ESP_SLEEP_WAKEUP_GPIO` statt
-   `ESP_SLEEP_WAKEUP_EXT0` (in `main.cpp` beide prüfen, dann braucht die
-   Stelle kein `#if`). `POWER_ON` (Peripherie abschalten) entfällt auf der
-   Light komplett.
-7. **BLE: neue Geräte-Info-Characteristic** `6E40000A-...`, read-only,
-   UTF-8-JSON - der Kern der App-seitigen Erkennung:
-   ```json
-   {"model":"light-c3","name":"Massarbeit Waage Light","fw":"1.6.0",
-    "variant":"light-c3",
-    "caps":{"display":false,"battery":false,"buttons":1,"led":true,"ota":true}}
-   ```
-   JSON statt Byte-Bitmaske bewusst: lässt sich um ein Feld erweitern, ohne
-   dass App und Firmware gleichzeitig aktualisiert werden müssen. Auf der
-   Firmware reicht ein `snprintf`, kein Parser. Fehlt die Characteristic
-   (ältere Firmware), nimmt die App "große Waage mit Display" an - alte
-   Geräte funktionieren unverändert weiter.
-   Zusätzlich `BLE_DEVICE_NAME` je Variante (`Massarbeit-Waage` vs.
-   `Massarbeit-Light`), damit die zwei im Bluetooth-Dialog auseinanderzu-
-   halten sind. Am Kommandoprotokoll `0x01`/`0x10`-`0x15` ändert sich nichts.
-8. **Kein SPIFFS auf der Light** (keine Boot-Sprites, kein `uploadfs`).
-
-### Umbau App (Repo `massarbeit-app`)
-
-1. **`WeightSource`-Interface** bekommt `getDeviceInfo(): DeviceInfo | null`
-   (synchron, beim Verbinden einmal gelesen und gecacht - die UI liest es
-   reaktiv über den bestehenden `onConnectionChange`-Listener, kein zweiter
-   Benachrichtigungsweg nötig). `DeviceInfo`: `modelId`, `name`,
-   `firmwareVersion`, `hasDisplay`, `hasBattery`, `buttonCount`,
-   `firmwareVariant`.
-2. **`BleWeightSource`** liest die Geräte-Info-Characteristic in
-   `connectGatt()` im eigenen `try/catch` - exakt das Muster, mit dem
-   Akkustand und OTA-Characteristics schon optional behandelt werden.
-   Fallback bei Fehlen: `t-display-s3`, `hasDisplay: true`.
-   `CorrectedWeightSource` reicht durch, `MockWeightSource` liefert einen
-   Fake - dort per Query-Parameter (`?device=light`) umschaltbar, damit sich
-   die Light-UI ohne Hardware testen lässt.
-3. **`lib/firmwareUpdate.ts`:** Manifest-Schema v2 mit
-   `variants: { "t-display-s3": {...}, "light-c3": {...} }`, Auswahl über
-   `deviceInfo.firmwareVariant`. Die alten Top-Level-Felder
-   (`version`/`file`/`size`/`md5`) bleiben zusätzlich als Spiegel der
-   S3-Variante bestehen, damit ein alter, im Browser gecachter App-Stand
-   nicht kaputtgeht. Gibt es für ein Modell noch kein Release, sauber
-   "für dieses Modell liegt noch kein Update bereit" anzeigen statt Fehler.
-4. **UI-Anpassungen:** `ConnectScaleButton` zeigt den Modellnamen statt
-   pauschal "Waage verbunden"; `BatteryIndicator` bleibt bei
-   `hasBattery: false` weg (tut er faktisch schon, weil `0xFF` -> `null`);
-   `SettingsScreen` zeigt Modell + Firmware-Variante; Texte, die ein
-   Display voraussetzen, für die Light umformulieren.
-
-### Release-Prozess
-
-Ein Manifest, ein Update-Weg, zwei Binaries. Der bisherige 5-Schritte-
-Handbetrieb (bauen, `md5sum`, kopieren, `manifest.json` von Hand pflegen,
-committen) wird mit zwei Varianten fehleranfällig - deshalb ein kleines
-`scripts/release.py`: baut ein Environment, kopiert die `.bin` nach
-`firmware/`, rechnet Größe + MD5 aus und schreibt den Varianten-Eintrag ins
-Manifest. Python ist ohnehin da, PlatformIO läuft darauf.
+**Warum:** Die Status-LED trägt die Zustände zwar zuverlässig, aber sie
+setzt voraus, dass jemand hinschaut - auf einer Party konkurriert sie mit
+Licht, Bewegung und Handydisplays. Und die Kalibrierung hängt weiterhin am
+Serial Monitor, also am USB-Kabel.
 
 **Offene Fragen, noch nicht entschieden:**
 
-- Welches C3-Board konkret gekauft wird (SuperMini mit einfarbiger LED vs.
-  ein Board mit WS2812) - davon hängt ab, ob die LED Farben zeigen kann oder
-  nur Blinkmuster.
-- Akku ja/nein: mit LiPo + Spannungsteiler + Laderegler ist der Preisvorteil
-  gegenüber der großen Waage schon halb weg. Vielleicht bewusst reiner
-  USB-Powerbank-Betrieb, dann fällt Akkumessung *und* Deep-Sleep-Nutzen
-  weitgehend weg.
-- Reicht der Status-LED-Umfang, oder soll die Light Ereignisse zusätzlich
-  über einen Piezo/Summer quittieren (hörbar statt sichtbar - auf einer
-  Party evtl. praktischer)?
-- Kalibrierung ohne Display: bleibt es bei der Serial-Routine (man hängt
-  zum Einrichten ohnehin am USB), oder wandert sie ganz in die App? Die
-  3-Punkt-Eichung dort deckt den Alltagsfall schon ab.
-- Eigenes Gehäuse für die Light (viel kleiner, ohne Display-Ausschnitt) -
-  eigener Entwurf oder parametrische Variante des bestehenden
-  `massarbeit_waage_case.scad`? Verzahnt sich mit "Neues Gehäuse für die
-  Waage entwerfen und drucken" weiter unten.
-- Sollen mehrere Waagen gleichzeitig an einer App-Instanz hängen können?
-  Aktuell ist `sharedWeightSource` bewusst ein Singleton. Wäre eine eigene,
-  deutlich größere Ausbaustufe - hier nur als Folgefrage notiert, weil
-  billige Light-Geräte sie überhaupt erst realistisch machen.
+- Soll die Light Ereignisse zusätzlich über einen Piezo/Summer quittieren
+  (hörbar statt sichtbar)? Ein kurzer Ton beim Volltreffer/Fehlschlag käme
+  auch dann an, wenn gerade niemand auf die Waage schaut. Kostet einen
+  weiteren freien GPIO und ein Bauteil.
+- Kalibrierung ohne Display: bleibt es bei der Serial-Routine (zum
+  Einrichten hängt man ohnehin am USB), oder wandert sie ganz in die App?
+  Die 3-Punkt-Eichung dort (`calibrationStore.ts` im App-Repo) deckt den
+  Alltagsfall schon ab - die Firmware-Grundkalibrierung braucht man aber
+  weiterhin einmal je Gerät.
+- Reicht der Umfang der LED-Muster, oder fehlt ein Zustand? Die Zuordnung
+  steht in der Tabelle im README ("Was die Status-LED der Light sagt").
 
-**Status:** Nicht begonnen. Die Architekturentscheidung oben (eine
-Codebasis + zwei Build-Targets, eine App mit Laufzeit-Erkennung) ist
-getroffen, die Umsetzung steht noch komplett aus.
+**Status:** Nicht begonnen. Die Light selbst läuft (Firmware 1.7.0), das
+hier ist Feinschliff.
 
-## 7. Neues Gehäuse für die Waage entwerfen und drucken
+## 7. Mehrere Waagen gleichzeitig an einer App-Instanz
 
-**Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Waage, statt des
-aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
-`massarbeit_waage_base.stl`/`massarbeit_waage_platform.stl`).
+**Idee:** Mehr als eine Waage an dieselbe laufende App hängen - für mehrere
+Tische/Gruppen auf derselben Party.
+
+**Warum:** Erst durch die billige Light ist "mehrere Waagen" überhaupt eine
+realistische Anschaffung. Solange eine Waage der Preis eines T-Display S3
+war, stellte sich die Frage praktisch nicht.
+
+**Was dafür fehlt - der eigentliche Knackpunkt:** `sharedWeightSource`
+(App-Repo) ist bewusst ein Singleton: genau eine `BleWeightSource`, genau
+eine `CorrectedWeightSource` darüber, und jeder Hook/jedes Spiel greift
+direkt darauf zu. Mehrere Geräte hieße, aus dieser globalen Konstante eine
+Sammlung zu machen - und an jeder Verbrauchsstelle zu entscheiden, welche
+Waage gemeint ist.
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Wozu genau? Zwei unabhängige Runden parallel (jede Waage ihr eigenes
+  Spiel), oder eine Runde, in der mehrere Spieler gleichzeitig an
+  verschiedenen Waagen trinken?
+- Wie wird eine Waage einem Spieler/Tisch zugeordnet - von Hand in der
+  Lobby, oder automatisch über den BLE-Namen/die Modellkennung (siehe
+  `getDeviceInfo()`)?
+- Web Bluetooth erlaubt mehrere gleichzeitige GATT-Verbindungen, verlangt
+  aber je Gerät einen eigenen `requestDevice()`-Dialog aus einer
+  Nutzer-Geste. Wie sieht der Verbindungsablauf für drei Waagen aus, ohne
+  dass er sich wie eine Behörde anfühlt?
+- Reicht der Durchsatz? Jede Waage schickt 20 Gewichts-Notifies pro Sekunde.
+
+**Status:** Nicht begonnen. Deutlich größere Ausbaustufe als es zunächst
+klingt - hier notiert, weil die Light sie überhaupt erst realistisch macht.
+
+## 8. Neue Gehäuse entwerfen und drucken (große Waage und Light)
+
+**Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die große Waage, statt
+des aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
+`massarbeit_waage_base.stl`/`massarbeit_waage_platform.stl`) - und ein
+Gehäuse für die Light, für die es bisher überhaupt keins gibt.
 
 **Referenz/Inspiration:** [Smart DIY Kitchen Scale for Precision Cooking (instructables.com)](https://www.instructables.com/Smart-DIY-Kitchen-Scale-for-Precision-Cooking/)
 
@@ -447,5 +288,10 @@ aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
   `massarbeit_waage_case.scad`?
 - Bleibt es bei OpenSCAD (parametrisch, gut versionierbar als Textdatei)
   als Werkzeug?
+- Die Light braucht ein deutlich kleineres Gehäuse ohne Display-Ausschnitt
+  (ESP32-Board im D1-mini-Format statt T-Display S3, dafür ein externer
+  Taster und eine sichtbare Status-LED). Eigener Entwurf oder parametrische
+  Variante desselben `.scad` - also ein Parameter "Modell" statt zweier
+  Dateien, die auseinanderdriften?
 
 **Status:** Nicht begonnen.
