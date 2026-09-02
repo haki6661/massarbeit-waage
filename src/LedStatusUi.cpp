@@ -47,8 +47,8 @@ void LedStatusUi::begin() {
 
 void LedStatusUi::setLevel(uint8_t level) {
 #if MASSARBEIT_HAS_STATUS_LED
-    if (!ready_ || level == lastLevel_) return;
-    lastLevel_ = level;
+    if (!ready_ || lastLevel_ == static_cast<int16_t>(level)) return;
+    lastLevel_ = static_cast<int16_t>(level);
     // Wahrgenommene Helligkeit waechst nicht linear mit dem Tastverhaeltnis -
     // ohne diese Quadrierung wirkt ein Atem-Verlauf, als bliebe die LED die
     // meiste Zeit einfach hell.
@@ -68,6 +68,7 @@ void LedStatusUi::prepareForSleep() {
     // LEDC laeuft im Deep Sleep nicht weiter; den Pin trotzdem definiert
     // hinterlassen, damit die LED nicht je nach Beschaltung schwach
     // weiterglimmt.
+    lastLevel_ = -1;
     ledcDetachPin(Pins::STATUS_LED);
     pinMode(Pins::STATUS_LED, OUTPUT);
     digitalWrite(Pins::STATUS_LED, MASSARBEIT_STATUS_LED_ACTIVE_LOW ? HIGH : LOW);

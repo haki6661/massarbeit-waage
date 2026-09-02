@@ -90,7 +90,10 @@ private:
     void setLevel(uint8_t level);
 
     bool ready_ = false;
-    uint8_t lastLevel_ = 0xFF; // 0xFF = noch nie gesetzt
+    // Bewusst int16_t mit -1 als "noch nie gesetzt": 0xFF waere als uint8_t
+    // nicht von der gueltigen Vollhelligkeit 255 zu unterscheiden, ein
+    // allererstes setLevel(255) wuerde stillschweigend verschluckt.
+    int16_t lastLevel_ = -1;
     const char* lastSignalName_ = nullptr;
     uint32_t signalStartMs_ = 0; // Beginn des aktuellen Signals (Bezugspunkt der Muster)
 
