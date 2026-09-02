@@ -11,44 +11,10 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 
-// Lokaler Anzeige-Zustand, wenn WEDER ein RemoteCue laeuft NOCH ein Spieler
-// am Zug ist (siehe hasActivePlayer_) - die Waage ist "zwischen Spielen".
-// Ersetzt die bisherige reine Live-Gewichtsanzeige (war nur zum Debuggen
-// gedacht) durch die Geraete-Spielauswahl: Taste 1 kurz schaltet durch die
-// Spieleliste, Taste 2 kurz bestaetigt.
-enum class LocalScreen {
-    GamePicker,     // "<Icon> <Name>", Taste 1/2-Hinweis
-    GameConfirmed,  // "<Name> ausgewaehlt - jetzt in der App oeffnen"
-};
-
-// Von der App per BLE ferngesteuerte Anzeige-Hinweise (siehe Config.h fuer
-// das Kommando-Protokoll) - ueberlagern LocalScreen voruebergehend, z.B.
-// waehrend des Turn-Readiness-Rituals eines Spiels. Grundgeruest: aktuell
-// nur Text/Farbe je Zustand, spaeter geplant sind echte Animationen
-// (Abschlag-Animation, unterschiedliche Animation je Ergebnis-Guete).
-enum class RemoteCue {
-    None,
-    Ready,          // "Bereit, jetzt trinken"
-    Away,           // Glas komplett von der Waage gehoben ("Abschlag") - laeuft
-                    // als Endlosschleife weiter, bis Ergebnis/Idle kommt
-    ResultMiss,     // Schluck lag daneben
-    ResultClose,    // Schluck lag nah am Ziel
-    ResultPerfect,  // Schluck hat exakt getroffen
-};
-
-// Welches Spiel gerade laeuft - bestimmt, welche Away-Animation gezeigt wird
-// (Ball/Pfeil/Karte/Block, siehe renderAway*() in TftDisplay.cpp) und das
-// kleine Icon im Spieler-Badge. Werte muessen exakt zum <gameId>-Byte im
-// BLE-Protokoll passen, siehe Config.h.
-enum class GameKind : uint8_t {
-    None = 0,
-    Golf = 1,
-    Dart = 2,
-    Blackjack = 3,
-    Tower = 4,
-    Scale = 5,
-    Boxen = 6,
-};
+// LocalScreen/RemoteCue/GameKind sind nicht TFT-spezifisch, sondern die
+// gemeinsame Zustandssprache beider Geraetevarianten (die Light bildet sie
+// auf LED-Muster ab) - deshalb ausgelagert.
+#include "DeviceUiTypes.h"
 
 class TftDisplay {
 public:
@@ -97,6 +63,13 @@ public:
     // einmalig in setup() - siehe main.cpp.
     void playBootSprite(bool (*stepInit)());
 
+    // Gemeinsamer Einstiegspunkt beider Varianten fuer die Startsequenz -
+    // main.cpp ruft nur noch diesen, egal ob TFT oder Status-LED dahinter
+    // steht. Auf der grossen Waage ist das genau die Sprite-Animation; der
+    // Name playBootSprite() bleibt bewusst bestehen, weil die komplette
+    // Sprite-Doku (data/README.md, BOOT_SPRITE_ASSETS.md) darauf verweist.
+    void runBootSequence(bool (*stepInit)()) { playBootSprite(stepInit); }
+
     // Von BleWeightService bei einem 0x10/0x11/0x12/0x13-Kommando aufgerufen.
     // Ueberlagert die naechsten update()-Aufrufe, bis entweder explizit
     // RemoteCue::None gesetzt wird oder das interne Timeout ablaeuft
@@ -112,6 +85,11 @@ public:
     // gekuerzt (mehr passt auf dem 320x170-Display ohnehin nicht lesbar hin).
     void setActivePlayer(GameKind game, uint16_t color565, const String& name);
     void clearActivePlayer();
+
+    // Gegenstueck zu LedStatusUi::prepareForSleep(). Auf der grossen Waage
+    // nichts zu tun: main.cpp schaltet direkt danach POWER_ON ab, was Display
+    // und Hintergrundbeleuchtung ohnehin komplett stromlos macht.
+    void prepareForSleep() {}
 
     // Wandelt 8-Bit-RGB (wie von der App per BLE geschickt, siehe
     // COMMAND_PLAYER_TURN in Config.h) in den RGB565-Wert um, den Arduino_GFX

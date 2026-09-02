@@ -2,6 +2,19 @@
 #include "BoardConfig.h"
 #include "Config.h"
 
+#if !MASSARBEIT_HAS_DEV_OTA
+
+// Variante ohne Entwicklungs-OTA (Light): leere Implementierungen, damit
+// main.cpp ohne #if auskommt. Da hier weder WiFi.h noch ArduinoOTA.h
+// eingebunden werden, faellt der komplette WLAN-Code aus dem Binary.
+
+bool DevOta::bootHeld() { return false; }
+void DevOta::begin() {}
+void DevOta::update() {}
+String DevOta::statusLine() const { return "OTA: nicht verfuegbar"; }
+
+#else
+
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 
@@ -67,3 +80,5 @@ String DevOta::statusLine() const {
     if (!active_) return "OTA: aus";
     return "OTA: " + WiFi.localIP().toString();
 }
+
+#endif // MASSARBEIT_HAS_DEV_OTA

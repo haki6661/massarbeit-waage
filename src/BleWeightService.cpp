@@ -1,8 +1,8 @@
 #include "BleWeightService.h"
 #include "Config.h"
 
-BleWeightService::BleWeightService(Scale& scale, TftDisplay& display, Battery& battery)
-    : scale_(scale), display_(display), battery_(battery) {}
+BleWeightService::BleWeightService(Scale& scale, DeviceUi& ui, Battery& battery)
+    : scale_(scale), ui_(ui), battery_(battery) {}
 
 void BleWeightService::begin() {
     Serial.println("[BLE] Initialisiere NimBLE...");
@@ -42,6 +42,16 @@ void BleWeightService::begin() {
         BLE_VERSION_CHAR_UUID,
         NIMBLE_PROPERTY::READ);
     versionChar_->setValue(FIRMWARE_VERSION);
+
+    // Modell + Faehigkeiten als JSON (siehe BLE_DEVICE_INFO_CHAR_UUID in
+    // Config.h). Die App liest das beim Verbinden einmal und entscheidet
+    // danach, ob sie z.B. Akkuanzeige und display-bezogene Texte zeigt.
+    deviceInfoChar_ = service->createCharacteristic(
+        BLE_DEVICE_INFO_CHAR_UUID,
+        NIMBLE_PROPERTY::READ);
+    String deviceInfo = buildDeviceInfoJson();
+    deviceInfoChar_->setValue(deviceInfo.c_str());
+    Serial.printf("[BLE] Geraete-Info: %s\n", deviceInfo.c_str());
 
     // Firmware-Update per BLE (siehe OtaUpdater.h) - WRITE statt WRITE_NR fuer
     // beide Update-Characteristics: Chunks duerfen beim Flashen nicht
@@ -107,6 +117,26 @@ void BleWeightService::update() {
     }
 
     ota_.update();
+}
+
+String BleWeightService::buildDeviceInfoJson() const {
+    // Handgeschrieben statt mit einer JSON-Library: der Inhalt ist fest
+    // verdrahtet (alles Compile-Zeit-Konstanten aus dem Board-Profil), es gibt
+    // nichts zu escapen, und eine Library dafuer ins Binary zu ziehen waere
+    // unverhaeltnismaessig. Gelesen wird das JSON nur auf App-Seite.
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+             "{\"model\":\"%s\",\"name\":\"%s\",\"fw\":\"%s\",\"variant\":\"%s\","
+             "\"caps\":{\"display\":%s,\"battery\":%s,\"buttons\":%d,\"led\":%s,\"ota\":true}}",
+             MASSARBEIT_MODEL_ID,
+             MASSARBEIT_MODEL_NAME,
+             FIRMWARE_VERSION,
+             MASSARBEIT_MODEL_ID,
+             MASSARBEIT_HAS_TFT ? "true" : "false",
+             MASSARBEIT_HAS_BATTERY ? "true" : "false",
+             MASSARBEIT_BUTTON_COUNT,
+             MASSARBEIT_HAS_STATUS_LED ? "true" : "false");
+    return String(buf);
 }
 
 void BleWeightService::sendWeight(float grams) {
@@ -188,11 +218,11 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
             break;
 
         case COMMAND_DISPLAY_IDLE:
-            display_.setRemoteCue(RemoteCue::None);
+            ui_.setRemoteCue(RemoteCue::None);
             break;
 
         case COMMAND_DISPLAY_READY:
-            display_.setRemoteCue(RemoteCue::Ready);
+            ui_.setRemoteCue(RemoteCue::Ready);
             break;
 
         case COMMAND_DISPLAY_AWAY: {
@@ -200,7 +230,7 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
             // das Byte bekommen die generische (Golf-)Animation, siehe
             // TftDisplay::renderRemoteCueScreen().
             GameKind game = value.size() >= 2 ? static_cast<GameKind>(value[1]) : GameKind::None;
-            display_.setRemoteCue(RemoteCue::Away, game);
+            ui_.setRemoteCue(RemoteCue::Away, game);
             break;
         }
 
@@ -213,7 +243,7 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
             RemoteCue cue = quality >= 2 ? RemoteCue::ResultPerfect
                           : quality == 1 ? RemoteCue::ResultClose
                                          : RemoteCue::ResultMiss;
-            display_.setRemoteCue(cue);
+            ui_.setRemoteCue(cue);
             break;
         }
 
@@ -224,7 +254,7 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
                 break;
             }
             GameKind game = static_cast<GameKind>(value[1]);
-            uint16_t color565 = display_.color565FromRgb(
+            uint16_t color565 = ui_.color565FromRgb(
                 static_cast<uint8_t>(value[2]), static_cast<uint8_t>(value[3]), static_cast<uint8_t>(value[4]));
             uint8_t nameLen = static_cast<uint8_t>(value[5]);
             String name;
@@ -233,12 +263,12 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
             for (size_t i = 0; i < take; i++) {
                 name += value[6 + i];
             }
-            display_.setActivePlayer(game, color565, name);
+            ui_.setActivePlayer(game, color565, name);
             break;
         }
 
         case COMMAND_PLAYER_CLEAR:
-            display_.clearActivePlayer();
+            ui_.clearActivePlayer();
             break;
 
         default:

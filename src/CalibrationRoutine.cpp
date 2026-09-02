@@ -1,7 +1,7 @@
 #include "CalibrationRoutine.h"
 
-CalibrationRoutine::CalibrationRoutine(Scale& scale, TftDisplay& display)
-    : scale_(scale), display_(display) {}
+CalibrationRoutine::CalibrationRoutine(Scale& scale, DeviceUi& ui)
+    : scale_(scale), ui_(ui) {}
 
 String CalibrationRoutine::readSerialLine() {
     String line;
@@ -51,21 +51,21 @@ void CalibrationRoutine::run() {
     Serial.println(" Kalibrierung gestartet");
     Serial.println("==================================================");
 
-    display_.showMessage("Kalibrierung", "Waage leeren,\ndann Enter im\nSerial Monitor.");
+    ui_.showMessage("Kalibrierung", "Waage leeren,\ndann Enter im\nSerial Monitor.");
     Serial.println("[Kalibrierung] Waage leeren und Enter druecken...");
     waitForAnyInput();
 
     scale_.tare();
     Serial.println("[Kalibrierung] Tariert.");
 
-    display_.showMessage("Kalibrierung", "Bekanntes Gewicht\nauflegen. Gramm\neingeben + Enter.");
+    ui_.showMessage("Kalibrierung", "Bekanntes Gewicht\nauflegen. Gramm\neingeben + Enter.");
     Serial.println("[Kalibrierung] Bekanntes Gewicht auflegen, Gramm eingeben (z.B. 500) und Enter druecken.");
     String input = readSerialLine();
     float knownWeightGrams = input.toFloat();
 
     if (knownWeightGrams <= 0.0f) {
         Serial.printf("[Kalibrierung] FEHLER: Ungueltiges Gewicht '%s'. Abgebrochen.\n", input.c_str());
-        display_.showMessage("Kalibrierung", "Fehler:\nungueltiges Gewicht.\nAbgebrochen.");
+        ui_.showMessage("Kalibrierung", "Fehler:\nungueltiges Gewicht.\nAbgebrochen.");
         delay(2000);
         return;
     }
@@ -73,7 +73,7 @@ void CalibrationRoutine::run() {
     long raw = scale_.getRawValue();
     if (raw == 0) {
         Serial.println("[Kalibrierung] FEHLER: Rohwert ist 0 - HX711 verbunden?");
-        display_.showMessage("Kalibrierung", "Fehler: Rohwert 0.\nHX711 pruefen.");
+        ui_.showMessage("Kalibrierung", "Fehler: Rohwert 0.\nHX711 pruefen.");
         delay(2000);
         return;
     }
@@ -91,7 +91,7 @@ void CalibrationRoutine::run() {
         Serial.printf("[Kalibrierung] FEHLER: Unplausibler Faktor %.6f (Rohwert=%ld) - "
                       "stand das Referenzgewicht wirklich schon stabil auf der Waage? "
                       "Abgebrochen, alter Faktor bleibt erhalten.\n", newFactor, raw);
-        display_.showMessage("Kalibrierung", "Fehler: Wert\nunplausibel.\nBitte erneut\nversuchen.");
+        ui_.showMessage("Kalibrierung", "Fehler: Wert\nunplausibel.\nBitte erneut\nversuchen.");
         delay(2500);
         return;
     }
@@ -103,6 +103,6 @@ void CalibrationRoutine::run() {
 
     char body[64];
     snprintf(body, sizeof(body), "Fertig!\nFaktor: %.4f", newFactor);
-    display_.showMessage("Kalibrierung", body);
+    ui_.showMessage("Kalibrierung", body);
     delay(3000);
 }

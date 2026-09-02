@@ -16,17 +16,18 @@
 #include <NimBLEServer.h>
 
 #include "Battery.h"
+#include "DeviceUi.h"
 #include "OtaUpdater.h"
 #include "Scale.h"
-#include "TftDisplay.h"
 
 class BleWeightService : public NimBLEServerCallbacks, public NimBLECharacteristicCallbacks {
 public:
-    // display: fuer die 0x10-0x13-Anzeige-Kommandos (siehe Config.h) -
+    // ui: fuer die 0x10-0x15-Anzeige-Kommandos (siehe Config.h) - je nach
+    // Variante das TFT oder die Status-LED der Light (siehe DeviceUi.h) -
     // die Waage kennt kein eigenes Spielkonzept, sie leitet nur weiter, was
     // die App ihr sagt. battery: fuer die Akkustand-Characteristic (deutlich
     // seltener aktualisiert als das Gewicht, siehe update()).
-    BleWeightService(Scale& scale, TftDisplay& display, Battery& battery);
+    BleWeightService(Scale& scale, DeviceUi& ui, Battery& battery);
 
     void begin();
     void update(); // in loop() aufrufen: sendet Gewicht, haelt Advertising am Laufen
@@ -53,13 +54,14 @@ private:
     static const uint8_t COMMAND_PLAYER_CLEAR = 0x15;
 
     Scale& scale_;
-    TftDisplay& display_;
+    DeviceUi& ui_;
     Battery& battery_;
     NimBLEServer* server_ = nullptr;
     NimBLECharacteristic* weightChar_ = nullptr;
     NimBLECharacteristic* commandChar_ = nullptr;
     NimBLECharacteristic* batteryChar_ = nullptr;
     NimBLECharacteristic* versionChar_ = nullptr;
+    NimBLECharacteristic* deviceInfoChar_ = nullptr;
     OtaUpdater ota_;
 
     volatile bool connected_ = false;
@@ -68,6 +70,11 @@ private:
     uint32_t lastBatteryNotifyMs_ = 0;
     uint16_t connHandle_ = BLE_HS_CONN_HANDLE_NONE;
     bool otaFastLinkActive_ = false;
+
+    // Baut den JSON-Steckbrief fuer BLE_DEVICE_INFO_CHAR_UUID aus den
+    // MASSARBEIT_*-Makros des Board-Profils. Einmal in begin() gesetzt -
+    // der Inhalt kann sich zur Laufzeit nicht aendern.
+    String buildDeviceInfoJson() const;
 
     void sendWeight(float grams);
     void sendBattery(int8_t percent);

@@ -7,17 +7,18 @@
 #include "Scale.h"
 #include "BleWeightService.h"
 #include "Buttons.h"
-#include "TftDisplay.h"
+#include "DeviceUi.h"
 #include "Battery.h"
 #include "CalibrationRoutine.h"
 #include "DevOta.h"
 
 Scale scale(Pins::HX711_DOUT, Pins::HX711_SCK, DEFAULT_CALIBRATION_FACTOR);
-TftDisplay display;
+// TFT (grosse Waage) oder Status-LED (Light) - siehe DeviceUi.h.
+DeviceUi ui;
 Battery battery;
-BleWeightService bleService(scale, display, battery);
+BleWeightService bleService(scale, ui, battery);
 Buttons buttons;
-CalibrationRoutine calibration(scale, display);
+CalibrationRoutine calibration(scale, ui);
 DevOta devOta;
 
 bool calibrationRequested = false;
@@ -25,7 +26,7 @@ bool sleepRequested = false;
 bool devOtaActive = false;
 
 // Fuer runNextBootStep() (siehe unten) - muss ausserhalb von setup() stehen,
-// weil TftDisplay::playBootSprite() zwischen den Sprite-Frames darauf
+// weil DeviceUi::runBootSequence() zwischen den Frames/Blinkschritten darauf
 // zugreift, waehrend setup() selbst noch "pausiert" (in playBootSprite()).
 bool bootDevOtaRequested = false;
 bool bootHx711Ok = true;
@@ -37,12 +38,14 @@ unsigned long lastActivityMs = 0;
 float lastActivityWeight = 0.0f;
 bool activityBaselineSet = false;
 
-// Taste 1 kurz: Geraete-Spielauswahl, naechste Option. Tara gibt es als
-// eigene Tastenfunktion nicht mehr - laeuft nur noch automatisch
+#if MASSARBEIT_BUTTON_COUNT >= 2
+
+// Taste 1 kurz: Geraete-Spielauswahl, naechste Option. Tara gibt es auf der
+// grossen Waage als eigene Tastenfunktion nicht mehr - es laeuft automatisch
 // (Auto-Zero-Nachfuehrung, siehe Scale.cpp) oder ueber die App
 // (BLE-Kommando 0x01).
 void onButton1Click() {
-    display.pickerNext();
+    ui.pickerNext();
     lastActivityMs = millis();
 }
 
@@ -50,43 +53,67 @@ void onButton1Click() {
 // automatisches Umschalten der App (siehe ROADMAP.md, "App-Sync:
 // Geraete-Spielauswahl schaltet die App mit um").
 void onButton2Click() {
-    display.pickerConfirm();
+    ui.pickerConfirm();
     lastActivityMs = millis();
 }
 
-void onCalibrationLongPress() {
+#else
+
+// Light: nur ein Taster, und ohne Display gibt es keine Geraete-Spielauswahl
+// zum Durchschalten - der kurze Klick ist damit frei und uebernimmt Tara
+// (auf der grossen Waage die einzige Tastenfunktion, die weggefallen ist).
+void onButton1Click() {
+    Serial.println("[Button] Kurzer Klick: Tara.");
+    scale.tare();
+    lastActivityMs = millis();
+}
+
+#endif
+
+void onCalibrationRequested() {
     calibrationRequested = true;
     lastActivityMs = millis();
 }
 
 void onSleepLongPress() {
-    Serial.println("[Button] Taste 1 lang: Deep Sleep angefordert.");
+    Serial.println("[Button] Langer Druck: Deep Sleep angefordert.");
     sleepRequested = true;
 }
 
 // Versetzt die Waage in Deep Sleep (~wenige µA statt 60-150+ mA aktiv).
-// Aufwachen NUR ueber Taste 2 (GPIO14) - bewusst nicht Taste 1/GPIO0, weil
-// das der BOOT-Strapping-Pin ist: waere er beim Aufwach-Boot noch gedrueckt,
-// koennte der Chip statt der Firmware in den Flash-Download-Modus starten.
+// Aufwachen NUR ueber Pins::WAKEUP_BUTTON (Board-Profil): auf der grossen
+// Waage Taste 2 (GPIO14), auf der Light der einzige Taster (GPIO33). Beide
+// sind bewusst KEIN Strapping-Pin - waere so einer beim Aufwach-Boot noch
+// gedrueckt, koennte der Chip statt der Firmware in den Flash-Download-Modus
+// starten (genau deshalb scheiden GPIO0 hier wie dort aus).
 // Nach dem Aufwachen laeuft die komplette Firmware (setup()) neu durch -
 // es gibt keinen speziellen "Resume"-Pfad, das ist bei ESP32-Deep-Sleep
 // so vorgesehen.
 void enterDeepSleep() {
+#if MASSARBEIT_BUTTON_COUNT >= 2
     Serial.println("[Power] Gehe in Deep Sleep. Taste 2 zum Aufwecken.");
-    display.showMessage("Gute Nacht", "Taste 2 zum\nAufwecken");
+    ui.showMessage("Gute Nacht", "Taste 2 zum\nAufwecken");
+#else
+    Serial.println("[Power] Gehe in Deep Sleep. Taster zum Aufwecken.");
+    ui.showMessage("Gute Nacht", "Taster zum\nAufwecken");
+#endif
     delay(1200);
 
-    digitalWrite(Pins::POWER_ON, LOW); // Peripherie (Display etc.) stromlos schalten
+    ui.prepareForSleep();
 
-    rtc_gpio_pullup_en((gpio_num_t)Pins::BUTTON_2);
-    rtc_gpio_pulldown_dis((gpio_num_t)Pins::BUTTON_2);
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)Pins::BUTTON_2, 0); // LOW = Taste 2 gedrueckt
+#if MASSARBEIT_HAS_POWER_ON
+    digitalWrite(Pins::POWER_ON, LOW); // Peripherie (Display etc.) stromlos schalten
+#endif
+
+    rtc_gpio_pullup_en((gpio_num_t)Pins::WAKEUP_BUTTON);
+    rtc_gpio_pulldown_dis((gpio_num_t)Pins::WAKEUP_BUTTON);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)Pins::WAKEUP_BUTTON, 0); // LOW = Taste gedrueckt
 
     esp_deep_sleep_start();
     // Wird nie erreicht.
 }
 
-// Wird von TftDisplay::playBootSprite() zwischen jedem angezeigten Frame
+// Wird von DeviceUi::runBootSequence() zwischen jedem angezeigten Frame
 // aufgerufen - erledigt EINEN Initialisierungsschritt pro Aufruf und gibt
 // true zurueck, solange noch etwas zu tun ist. So laeuft die Bootanimation
 // parallel zur echten Initialisierung, statt hinterher eine feste Dauer
@@ -101,8 +128,14 @@ bool runNextBootStep() {
             buttons.begin();
             buttons.onButton1Click(onButton1Click);
             buttons.onSleepLongPress(onSleepLongPress);
+#if MASSARBEIT_BUTTON_COUNT >= 2
             buttons.onButton2Click(onButton2Click);
-            buttons.onCalibrationLongPress(onCalibrationLongPress);
+            buttons.onCalibrationLongPress(onCalibrationRequested);
+#else
+            // Ein Taster: der lange Druck ist schon mit Deep Sleep belegt,
+            // die Kalibrierung haengt deshalb am Doppelklick (Buttons.h).
+            buttons.onCalibrationDoubleClick(onCalibrationRequested);
+#endif
             return true;
         case 2:
             bootHx711Ok = scale.begin();
@@ -136,7 +169,7 @@ void setup() {
 
     Serial.println();
     Serial.println("==================================================");
-    Serial.println(" Massarbeit Waage - LilyGO T-Display S3");
+    Serial.println(" " MASSARBEIT_MODEL_NAME " (" MASSARBEIT_MODEL_ID ")");
     Serial.println("==================================================");
     Serial.printf("Chip: %s rev %d, Free heap: %u bytes\n",
                    ESP.getChipModel(), ESP.getChipRevision(), ESP.getFreeHeap());
@@ -144,7 +177,7 @@ void setup() {
     esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
     bool wokeFromSleep = wakeupCause == ESP_SLEEP_WAKEUP_EXT0;
     if (wokeFromSleep) {
-        Serial.println("[Power] Aufgewacht aus Deep Sleep (Taste 2).");
+        Serial.println("[Power] Aufgewacht aus Deep Sleep (Aufweck-Taster).");
     }
 
     // Muss VOR allem anderen geprueft werden, das Taste 2 anfasst. NICHT
@@ -159,24 +192,28 @@ void setup() {
     bootDevOtaRequested = !wokeFromSleep && DevOta::bootHeld();
     devOtaActive = bootDevOtaRequested;
 
-    display.begin();
+    ui.begin();
 
-    // Kein Text-Zwischenscreen mehr davor ("Starte...") - die Sprite-
-    // Animation (data/, siehe playBootSprite()) laeuft direkt los und
-    // erledigt die eigentliche Initialisierung (battery/buttons/scale/BLE,
-    // siehe runNextBootStep() oben) parallel dazu, statt hinterher eine
-    // feste Dauer draufzuschlagen.
-    display.playBootSprite(runNextBootStep);
+    // Kein Text-Zwischenscreen mehr davor ("Starte...") - die Startsequenz
+    // (Sprite-Animation auf der grossen Waage, atmende Status-LED auf der
+    // Light) laeuft direkt los und erledigt die eigentliche Initialisierung
+    // (battery/buttons/scale/BLE, siehe runNextBootStep() oben) parallel
+    // dazu, statt hinterher eine feste Dauer draufzuschlagen.
+    ui.runBootSequence(runNextBootStep);
 
     if (!bootHx711Ok) {
-        display.showMessage("Fehler", "HX711 antwortet\nnicht. Verkabelung\npruefen.");
+        ui.showMessage("Fehler", "HX711 antwortet\nnicht. Verkabelung\npruefen.");
         Serial.println("[Setup] WARNUNG: Waage laeuft ohne HX711 weiter (liefert 0g).");
         delay(2000);
     }
 
     Serial.println("[Setup] Bereit.");
+#if MASSARBEIT_BUTTON_COUNT >= 2
     Serial.println("Taste 1: Spielauswahl weiter (kurz) / Deep Sleep (2s halten)");
     Serial.println("Taste 2: Spielauswahl bestaetigen (kurz) / Kalibrierung (lang halten)");
+#else
+    Serial.println("Taster: Tara (kurz) / Deep Sleep (2s halten) / Kalibrierung (Doppelklick)");
+#endif
     Serial.printf("[Power] Auto-Sleep nach %lu Minuten Inaktivitaet.\n", AUTO_SLEEP_TIMEOUT_MS / 60000UL);
 
     lastActivityMs = millis();
@@ -216,7 +253,7 @@ void loop() {
         calibration.run();
     }
 
-    display.update(scale.isHX711Connected(), bleService.isConnected());
+    ui.update(scale.isHX711Connected(), bleService.isConnected());
 
     delay(5);
 }
