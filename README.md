@@ -325,6 +325,16 @@ richtige ist, sagt die Geräte-Info-Characteristic (`variant`, siehe
 Abschnitt "BLE") - eine S3-Firmware landet also nie auf einer Basis. Kein WLAN am Partyort nötig - nur das Handy braucht
 Internet zum Herunterladen.
 
+**Schutz vor der falschen Variante:** die Waage prüft am Anfang der
+Übertragung die Chip-Kennung im Image-Header (Byte 12/13, `0x0009` =
+ESP32-S3, `0x0005` = ESP32-C3) gegen den Chip, auf dem sie selbst läuft, und
+lehnt ein fremdes Image sofort ab (`ChipMismatch`, Fehlercode 6 in
+`OtaUpdater.h`). Die Auswahl der richtigen `.bin` trifft zwar die App anhand
+der Geräte-Info — aber wenn dabei etwas schiefgeht (alte App im
+Browser-Cache, unlesbare Characteristic), soll das Gerät nicht erst beim
+Booten scheitern, sondern das Update ablehnen, solange die alte Firmware
+noch unangetastet läuft.
+
 Sicherheitsmechanismus: die neue Firmware landet in der inaktiven
 OTA-Partition (`app0`/`app1`, siehe Board-Partitionstabelle). Erst wenn
 Größe UND MD5 exakt passen, schaltet `Update.end(true)` die Waage beim

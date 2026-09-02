@@ -12,7 +12,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.8.0"
+#define FIRMWARE_VERSION "1.8.1"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -39,7 +39,7 @@
 // Modellerkennung. Die App liest die Characteristic einmal beim Verbinden und
 // stellt ihre Oberflaeche darauf ein (siehe DeviceInfo/WeightSource im
 // App-Repo). Inhalt, hier am Beispiel der Basis:
-//   {"model":"t-oi-plus","name":"Massarbeit","fw":"1.8.0",
+//   {"model":"t-oi-plus","name":"Massarbeit","fw":"1.8.1",
 //    "variant":"t-oi-plus",
 //    "caps":{"display":false,"battery":true,"buttons":1,"led":true,"ota":true}}
 // JSON statt einer kompakten Byte-Bitmaske ist Absicht: es laesst sich um ein
