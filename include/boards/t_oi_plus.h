@@ -1,6 +1,6 @@
 #pragma once
 
-// Board-Profil "Light": LilyGO T-OI Plus V1.3 (Silkscreen "mini D1 PLUS") -
+// Board-Profil "Basis": LilyGO T-OI Plus V1.3 (Silkscreen "mini D1 PLUS") -
 // die abgespeckte Waage OHNE Display. Sie wiegt und funkt, sonst nichts; das
 // gesamte Spielgeschehen laeuft ohnehin auf dem Handy. Rueckmeldung am Geraet
 // gibt es nur ueber die Onboard-LED (siehe LedStatusUi) und Serial.
@@ -25,13 +25,13 @@
 // Steuert die #if-Zweige im restlichen Code UND wird per BLE an die App
 // gemeldet, damit sie sich zur Laufzeit auf das Modell einstellen kann
 // (siehe BleWeightService::buildDeviceInfoJson()).
-#define MASSARBEIT_MODEL_ID        "light-c3"
-#define MASSARBEIT_MODEL_NAME      "Massarbeit Waage Light"
+#define MASSARBEIT_MODEL_ID        "t-oi-plus"
+#define MASSARBEIT_MODEL_NAME      "Massarbeit"
 // Eigener BLE-Name, damit die zwei Modelle im Bluetooth-Dialog des Handys
 // auseinanderzuhalten sind. Am Kommandoprotokoll (0x01, 0x10-0x15) aendert
-// sich nichts - die Light rendert dieselben Kommandos als LED-Muster statt
+// sich nichts - die Basis rendert dieselben Kommandos als LED-Muster statt
 // als Vollbild-Animation, die App muss davon nichts wissen.
-#define MASSARBEIT_BLE_NAME        "Massarbeit-Light"
+#define MASSARBEIT_BLE_NAME        "Massarbeit"
 #define MASSARBEIT_HAS_TFT         0
 #define MASSARBEIT_HAS_STATUS_LED  1
 // Einfarbige Onboard-LED, keine WS2812 - jede "Farbe" wird deshalb auf ein
@@ -42,7 +42,7 @@
 #define MASSARBEIT_HAS_BATTERY     1
 #define MASSARBEIT_BUTTON_COUNT    1
 #define MASSARBEIT_HAS_POWER_ON    0
-// Kein Entwicklungs-OTA per WLAN auf der Light: die Aktivierung haengt am
+// Kein Entwicklungs-OTA per WLAN auf der Basis: die Aktivierung haengt am
 // zweiten Taster (den es hier nicht gibt), und Firmware-Updates laufen
 // ohnehin ueber BLE aus der App (OtaUpdater). Spart nebenbei den kompletten
 // WLAN-/ArduinoOTA-Code im Binary.

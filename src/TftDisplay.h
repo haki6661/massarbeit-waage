@@ -12,7 +12,7 @@
 #include <Arduino_GFX_Library.h>
 
 // LocalScreen/RemoteCue/GameKind sind nicht TFT-spezifisch, sondern die
-// gemeinsame Zustandssprache beider Geraetevarianten (die Light bildet sie
+// gemeinsame Zustandssprache beider Geraetevarianten (die Basis bildet sie
 // auf LED-Muster ab) - deshalb ausgelagert.
 #include "DeviceUiTypes.h"
 
@@ -65,7 +65,7 @@ public:
 
     // Gemeinsamer Einstiegspunkt beider Varianten fuer die Startsequenz -
     // main.cpp ruft nur noch diesen, egal ob TFT oder Status-LED dahinter
-    // steht. Auf der grossen Waage ist das genau die Sprite-Animation; der
+    // steht. Auf der Vision ist das genau die Sprite-Animation; der
     // Name playBootSprite() bleibt bewusst bestehen, weil die komplette
     // Sprite-Doku (data/README.md, BOOT_SPRITE_ASSETS.md) darauf verweist.
     void runBootSequence(bool (*stepInit)()) { playBootSprite(stepInit); }
@@ -86,7 +86,7 @@ public:
     void setActivePlayer(GameKind game, uint16_t color565, const String& name);
     void clearActivePlayer();
 
-    // Gegenstueck zu LedStatusUi::prepareForSleep(). Auf der grossen Waage
+    // Gegenstueck zu LedStatusUi::prepareForSleep(). Auf der Vision
     // nichts zu tun: main.cpp schaltet direkt danach POWER_ON ab, was Display
     // und Hintergrundbeleuchtung ohnehin komplett stromlos macht.
     void prepareForSleep() {}

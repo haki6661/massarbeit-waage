@@ -23,7 +23,7 @@
 class BleWeightService : public NimBLEServerCallbacks, public NimBLECharacteristicCallbacks {
 public:
     // ui: fuer die 0x10-0x15-Anzeige-Kommandos (siehe Config.h) - je nach
-    // Variante das TFT oder die Status-LED der Light (siehe DeviceUi.h) -
+    // Variante das TFT oder die Status-LED der Basis (siehe DeviceUi.h) -
     // die Waage kennt kein eigenes Spielkonzept, sie leitet nur weiter, was
     // die App ihr sagt. battery: fuer die Akkustand-Characteristic (deutlich
     // seltener aktualisiert als das Gewicht, siehe update()).

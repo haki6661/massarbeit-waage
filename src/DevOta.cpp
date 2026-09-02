@@ -4,7 +4,7 @@
 
 #if !MASSARBEIT_HAS_DEV_OTA
 
-// Variante ohne Entwicklungs-OTA (Light): leere Implementierungen, damit
+// Variante ohne Entwicklungs-OTA (Basis): leere Implementierungen, damit
 // main.cpp ohne #if auskommt. Da hier weder WiFi.h noch ArduinoOTA.h
 // eingebunden werden, faellt der komplette WLAN-Code aus dem Binary.
 

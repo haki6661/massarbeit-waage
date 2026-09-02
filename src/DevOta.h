@@ -11,7 +11,7 @@
 // Party-Betrieb bleibt WLAN dadurch komplett aus (Akkuschonung, und die
 // Waage muss beim Trinkspiel nicht in Reichweite eines bekannten WLANs sein).
 //
-// Nur auf der grossen Waage (MASSARBEIT_HAS_DEV_OTA): der Light fehlt der
+// Nur auf der Vision (MASSARBEIT_HAS_DEV_OTA): der Basis fehlt der
 // zweite Taster fuer die Aktivierung, und Updates laufen dort ohnehin per
 // BLE aus der App. Dort sind alle Methoden leere Attrappen (siehe
 // DevOta.cpp), damit main.cpp ohne #if auskommt.

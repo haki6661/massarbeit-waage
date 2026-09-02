@@ -11,7 +11,7 @@ Geraet. Deshalb macht das hier ein Skript, das immer alle vier Werte
 Aufruf (aus dem Repo-Wurzelverzeichnis):
 
     python scripts/release.py               # beide Varianten
-    python scripts/release.py light-c3      # nur die Light
+    python scripts/release.py t-oi-plus      # nur die Basis
     python scripts/release.py --no-build    # nur Manifest aus vorhandenen .bin
 
 Die Version kommt aus FIRMWARE_VERSION in include/Config.h - sie wird NICHT
@@ -41,20 +41,20 @@ MANIFEST = FIRMWARE_DIR / "manifest.json"
 VARIANTS = {
     "t-display-s3": {
         "env": "t-display-s3",
-        "name": "Massarbeit Waage",
+        "name": "Massarbeit Vision",
         "bin": "firmware/t-display-s3.bin",
     },
-    "light-c3": {
-        "env": "massarbeit-light-c3",
-        "name": "Massarbeit Waage Light",
-        "bin": "firmware/light-c3.bin",
+    "t-oi-plus": {
+        "env": "t-oi-plus",
+        "name": "Massarbeit",
+        "bin": "firmware/t-oi-plus.bin",
     },
 }
 
 # Diese Variante spiegelt sich zusaetzlich in die Top-Level-Felder des
 # Manifests (version/file/size/md5). Reine Rueckwaertskompatibilitaet: ein
 # alter, im Browser gecachter App-Stand kennt "variants" noch nicht und liest
-# nur die Top-Level-Felder - der soll weiterhin die grosse Waage aktualisieren
+# nur die Top-Level-Felder - der soll weiterhin die Vision aktualisieren
 # koennen, statt am neuen Manifest zu scheitern.
 LEGACY_VARIANT = "t-display-s3"
 

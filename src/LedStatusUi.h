@@ -1,6 +1,6 @@
 #pragma once
 
-// Geraete-Anzeige der "Waage Light": dieselbe Methodenoberflaeche wie
+// Geraete-Anzeige der "Basisvariante": dieselbe Methodenoberflaeche wie
 // TftDisplay (siehe DeviceUi.h), aber statt eines Bildschirms gibt es genau
 // eine einfarbige Onboard-LED plus Serial-Ausgabe.
 //
@@ -28,7 +28,7 @@ public:
     // zuerst): HX711-Fehler > RemoteCue > Spieler am Zug > BLE-Verbindung.
     void update(bool hx711Connected, bool bleConnected);
 
-    // Auf dem TFT ein Vollbild-Text, hier eine Serial-Zeile - die Light hat
+    // Auf dem TFT ein Vollbild-Text, hier eine Serial-Zeile - die Basis hat
     // keinen Bildschirm, auf dem eine Kalibrier-Aufforderung stehen koennte.
     // Beim Kalibrieren haengt ohnehin ein USB-Kabel dran (siehe
     // CalibrationRoutine.h), die Meldung kommt also da an, wo sie gebraucht
@@ -47,9 +47,9 @@ public:
     void clearActivePlayer();
 
     // Ohne Display gibt es nichts auszuwaehlen - die Geraete-Spielauswahl
-    // entfaellt auf der Light ersatzlos. Bewusst als leere Methoden erhalten,
+    // entfaellt auf der Basis ersatzlos. Bewusst als leere Methoden erhalten,
     // damit die Oberflaeche beider Varianten identisch bleibt (main.cpp ruft
-    // sie auf der Light gar nicht erst auf, siehe MASSARBEIT_BUTTON_COUNT).
+    // sie auf der Basis gar nicht erst auf, siehe MASSARBEIT_BUTTON_COUNT).
     void pickerNext() {}
     void pickerConfirm() {}
 

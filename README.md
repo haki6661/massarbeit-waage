@@ -1,20 +1,22 @@
-# Maßarbeit Waage - Firmware
+# Maßarbeit - Waagen-Firmware
 
 Firmware fuer eine **eigene Praezisionswaage** fuer das Maßarbeit-Trinkspiel,
 basierend auf [WeighMyBru2](https://github.com/031devstudios/weighmybru2). Ein
 Board macht alles: Waegezelle auslesen, BLE-Service fuer die Handy-Web-App
 (siehe Schwesterprojekt "Maßarbeit App"), Anzeige.
 
-**Zwei Geraetevarianten, eine Codebasis:**
+**Zwei Geraetevarianten, eine Codebasis:** die **Maßarbeit Vision** mit TFT
+und die **Maßarbeit** ohne Display. Im Code und in dieser Datei heissen sie
+kurz "Vision" und "Basis".
 
-| | grosse Waage | Waage Light |
+| | Maßarbeit Vision | Maßarbeit |
 |---|---|---|
 | Board | LilyGO T-Display S3 (ESP32-S3, Xtensa) | LilyGO T-OI Plus V1.3 / "mini D1 PLUS" (ESP32-C3, RISC-V) |
 | Anzeige | 1,9" ST7789-TFT 170x320 | eine Status-LED |
 | Taster | zwei | einer (extern) |
 | Akku | ja | ja (16340-Halter + Laderegler an Bord) |
-| Build-Target | `t-display-s3` | `massarbeit-light-c3` |
-| BLE-Name | `Massarbeit-Waage` | `Massarbeit-Light` |
+| Build-Target | `t-display-s3` | `t-oi-plus` |
+| BLE-Name | `Massarbeit-Vision` | `Massarbeit` |
 
 Der geteilte Anteil ist gross: Waegezellen-Auswertung, das komplette
 BLE-Protokoll, Firmware-Update per BLE, Kalibrierung und Deep Sleep sind
@@ -26,14 +28,19 @@ Befehlssaetze sind verschieden. Also zwei Build-Targets aus einer Codebasis
 selbst, welches Modell dranhaengt (Geraete-Info-Characteristic, siehe
 Abschnitt "BLE").
 
+Die Modellkennungen (`t-display-s3`, `t-oi-plus`) benennen bewusst die
+HARDWARE, nicht das Produkt: unter ihnen sucht die App im Manifest das
+passende Release, sie muessen also stabil bleiben, auch wenn sich ein
+Produktname wieder aendert.
+
 Aktueller Stand: HX711-Handling + Kalibrierroutine + BLE-Gewichts-/Akkuservice
 (inkl. Fernsteuerung der Anzeige durch die App, siehe Abschnitt "BLE"
 weiter unten) + TFT-Anzeige mit Spieler-Badge und spielspezifischen
 Away-Animationen + Pixel-Art-Sprite-Bootanimation (siehe `data/`) +
-Status-LED-Anzeige derselben Zustände auf der Light + Taster-Bedienung +
+Status-LED-Anzeige derselben Zustände auf der Basis + Taster-Bedienung +
 Deep-Sleep-Stromsparmodus + Firmware-Update direkt aus der App per BLE (kein
 WLAN am Partyort nötig, siehe Abschnitt "Firmware-Update per BLE" weiter
-unten) + Entwicklungs-OTA per WLAN (nur grosse Waage). Die Away-/Ergebnis-
+unten) + Entwicklungs-OTA per WLAN (nur Vision). Die Away-/Ergebnis-
 Animationen (nicht der Boot) sind weiterhin rein prozedural aus
 Linien/Kreisen/Formen, kein Sprite noetig.
 
@@ -56,7 +63,7 @@ Beide Varianten teilen sich HX711 + 3kg-Single-Point-Waegezelle und einen
 1S-LiPo am jeweils eingebauten Laderegler. Die Pinbelegungen stehen als
 Board-Profile in `include/boards/`.
 
-### Grosse Waage: LilyGO T-Display S3
+### Maßarbeit Vision: LilyGO T-Display S3
 
 | Zweck | GPIO |
 |---|---|
@@ -73,7 +80,7 @@ Das ST7789-Display haengt an einem **8-Bit-Parallelbus** (Intel-8080-Timing),
 nicht an SPI - daher `Arduino_GFX` (`Arduino_ESP32PAR8Q`-Bus) statt
 `TFT_eSPI`/SPI-Displaytreiber.
 
-### Waage Light: LilyGO T-OI Plus V1.3 ("mini D1 PLUS")
+### Basisvariante: LilyGO T-OI Plus V1.3 ("mini D1 PLUS")
 
 ESP32-C3 (RISC-V), 4MB Flash, CH340C als USB-Serial-Wandler (kein nativer
 USB am Chip - Serial laeuft ueber UART0), Halter fuer eine 16340-Zelle mit
@@ -135,8 +142,8 @@ platformio.ini            <- zwei Build-Targets (+ Dev-OTA-Target)
 include/
   BoardConfig.h        <- Dispatcher: waehlt das Board-Profil zur Variante
   boards/
-    t_display_s3.h       <- Pins + Faehigkeiten der grossen Waage
-    light_t_oi_plus.h    <- Pins + Faehigkeiten der Light
+    t_display_s3.h       <- Pins + Faehigkeiten der Vision
+    t_oi_plus.h    <- Pins + Faehigkeiten der Basis
   Config.h              <- BLE-UUIDs, Kalibrier-Default, Dev-WLAN/OTA-Zugangsdaten
 src/
   main.cpp              <- verdrahtet alle Module
@@ -145,14 +152,14 @@ src/
   Buttons.h/.cpp          <- physische Taster statt Touch-Pads (OneButton-Lib)
   DeviceUi.h              <- waehlt TftDisplay oder LedStatusUi je Variante
   DeviceUiTypes.h         <- RemoteCue/GameKind/LocalScreen (beide Varianten)
-  TftDisplay.h/.cpp       <- nur grosse Waage: Arduino_GFX-Ausgabe (Status,
+  TftDisplay.h/.cpp       <- nur Vision: Arduino_GFX-Ausgabe (Status,
                             Spieler-Badge, spielspezifische Away-Animationen,
                             Sprite-Bootanimation aus SPIFFS)
-  LedStatusUi.h/.cpp      <- nur Light: dieselben Zustaende als LED-Muster
+  LedStatusUi.h/.cpp      <- nur Basis: dieselben Zustaende als LED-Muster
   Battery.h/.cpp          <- Akkuspannung (kalibrierter ADC, aus LilyGOs Beispiel) + Prozent-Schaetzung
   CalibrationRoutine.h/.cpp <- interaktive Kalibrierung ueber Serial+Taster
   OtaUpdater.h/.cpp        <- Firmware-Update per BLE (Chunks -> Update.h)
-  DevOta.h/.cpp           <- WLAN + ArduinoOTA, nur grosse Waage/Entwicklung
+  DevOta.h/.cpp           <- WLAN + ArduinoOTA, nur Vision/Entwicklung
 scripts/
   release.py             <- baut beide Varianten und schreibt das Manifest
 data/
@@ -160,13 +167,13 @@ data/
   pal.raw                 <- gemeinsame 256-Farben-Palette dafuer
 firmware/
   manifest.json          <- Version + Groesse + MD5 je Variante
-  t-display-s3.bin        <- Release-Binary grosse Waage (App laedt es per BLE)
-  light-c3.bin            <- Release-Binary Light
+  t-display-s3.bin        <- Release-Binary Vision (App laedt es per BLE)
+  t-oi-plus.bin           <- Release-Binary Basis
 ```
 
 ## Bedienung
 
-### Grosse Waage (zwei Taster)
+### Maßarbeit Vision (zwei Taster)
 
 - **Taste 1** kurz: Geräte-Spielauswahl, nächstes Spiel
 - **Taste 1** lang (~2s): sofort Deep Sleep (Display aus, ~wenige µA statt 60-150+ mA aktiv)
@@ -180,14 +187,14 @@ Aufwecken geht bewusst nur über Taste 2 (GPIO14), nicht über Taste 1: GPIO0
 gedrückt, könnte der Chip in den Flash-Download-Modus statt in die Firmware
 starten.
 
-### Waage Light (ein Taster)
+### Basisvariante (ein Taster)
 
-- **kurz**: Tara (auf der grossen Waage übernimmt das die Spielauswahl, hier ist der Klick frei)
+- **kurz**: Tara (auf der Vision übernimmt das die Spielauswahl, hier ist der Klick frei)
 - **lang (~2s)**: sofort Deep Sleep
 - **Doppelklick**: Kalibrierroutine starten
 - **drücken, während sie schläft**: aufwecken
 
-Eine Geräte-Spielauswahl gibt es auf der Light nicht - ohne Display ist
+Eine Geräte-Spielauswahl gibt es auf der Basis nicht - ohne Display ist
 nichts auszuwählen. Dev-OTA per WLAN entfällt ebenfalls (die Aktivierung
 hing am zweiten Taster); Firmware-Updates laufen per BLE aus der App.
 
@@ -197,11 +204,11 @@ Automatischer Deep Sleep nach 10 Minuten ohne Gewichtsänderung und ohne
 Tastendruck (`AUTO_SLEEP_TIMEOUT_MS` in `include/Config.h`) - außer während
 Dev-OTA aktiv ist.
 
-### Was die Status-LED der Light sagt
+### Was die Status-LED der Basis sagt
 
 Die LED ist einfarbig, also trägt allein das Zeitmuster die Information
 (siehe `LedStatusUi.cpp`). Ausführlicher steht alles zusätzlich im
-Serial-Log, das auf der Light den Bildschirm ersetzt.
+Serial-Log, das auf der Basis den Bildschirm ersetzt.
 
 | Zustand | Signal |
 |---|---|
@@ -219,12 +226,12 @@ Serial-Log, das auf der Light den Bildschirm ersetzt.
 ## Kalibrieren (Schritt 4 - mit der 3kg-Zelle neu ermitteln)
 
 1. Serial Monitor oeffnen (115200 Baud).
-2. Kalibrierung starten: grosse Waage Taste 2 ca. 1,5s halten, Light
+2. Kalibrierung starten: Vision Taste 2 ca. 1,5s halten, Basis
    Doppelklick auf den Taster - bis "Kalibrierung gestartet" erscheint.
 3. Waage leeren, Enter im Serial Monitor druecken.
 4. Bekanntes Referenzgewicht auflegen, dessen Gramm-Zahl eingeben (z.B. `500`), Enter druecken.
 5. Neuer Kalibrierfaktor wird berechnet, geloggt, auf der Geraeteanzeige
-   gezeigt (auf der Light nur ueber Serial) und automatisch im NVS gespeichert (`Preferences`, Namespace `scale`, Key
+   gezeigt (auf der Basis nur ueber Serial) und automatisch im NVS gespeichert (`Preferences`, Namespace `scale`, Key
    `calib`) - `DEFAULT_CALIBRATION_FACTOR` in `include/Config.h` wird danach
    nicht mehr verwendet.
 
@@ -242,8 +249,8 @@ unten). Eine weitere Read-Characteristic (`6E40000A-…`) liefert Modell und
 Fähigkeiten als UTF-8-JSON:
 
 ```json
-{"model":"light-c3","name":"Massarbeit Waage Light","fw":"1.7.1",
- "variant":"light-c3",
+{"model":"t-oi-plus","name":"Massarbeit","fw":"1.7.1",
+ "variant":"t-oi-plus",
  "caps":{"display":false,"battery":true,"buttons":1,"led":true,"ota":true}}
 ```
 
@@ -252,8 +259,8 @@ sich darauf ein (Modellname statt pauschal "Waage verbunden", passende
 Firmware-Variante beim Update, keine Texte, die ein Display voraussetzen).
 JSON statt einer Byte-Bitmaske ist Absicht: es lässt sich um ein Feld
 erweitern, ohne dass App und Firmware gleichzeitig aktualisiert werden
-müssen. Fehlt die Characteristic (ältere Firmware), nimmt die App "große
-Waage mit Display" an - alte Geräte funktionieren unverändert weiter.
+müssen. Fehlt die Characteristic (ältere Firmware), nimmt die App "Vision
+mit Display" an - alte Geräte funktionieren unverändert weiter.
 
 Eine Write-Characteristic nimmt Kommandos entgegen:
 
@@ -271,7 +278,7 @@ Eine Write-Characteristic nimmt Kommandos entgegen:
 (siehe `GameKind` in `DeviceUiTypes.h`). `0x10`-`0x15` lösen keine eigene
 Gewichtslogik aus - die Waage kennt kein Spielkonzept, sie zeigt nur, was
 die App ihr sagt (siehe `RemoteCue`/`DeviceUi::setActivePlayer()`). Die
-Kommandos sind für beide Varianten identisch - die Light rendert sie eben
+Kommandos sind für beide Varianten identisch - die Basis rendert sie eben
 als LED-Muster statt als Vollbild-Animation, die App muss davon nichts
 wissen. Die
 Away-/Ergebnis-Animationen sind rein prozedural (Linien/Kreise/Formen),
@@ -280,11 +287,11 @@ nur die Bootanimation nutzt echte Pixel-Art-Sprites (siehe `data/`).
 ## Bauen & Flashen
 
 ```
-pio run -e t-display-s3 -t upload          # grosse Waage, ueber USB-C
+pio run -e t-display-s3 -t upload          # Vision, ueber USB-C
 ```
 
 ```
-pio run -e massarbeit-light-c3 -t upload   # Waage Light, ueber USB
+pio run -e t-oi-plus -t upload   # Basisvariante, ueber USB
 ```
 
 ```
@@ -292,15 +299,15 @@ pio device monitor
 ```
 
 Welche Variante gebaut wird, entscheidet allein das Environment: es setzt
-`-DMASSARBEIT_VARIANT_PRO` bzw. `-DMASSARBEIT_VARIANT_LIGHT`, woraufhin
+`-DMASSARBEIT_VARIANT_VISION` bzw. `-DMASSARBEIT_VARIANT_BASE`, woraufhin
 `include/BoardConfig.h` das passende Board-Profil einbindet. Fehlt das Flag,
 bricht der Build mit einer `#error`-Meldung ab, statt still etwas Falsches
 zu bauen.
 
-Nur grosse Waage: die Boot-Sprite-Frames (`data/`) liegen auf einer eigenen
+Nur Vision: die Boot-Sprite-Frames (`data/`) liegen auf einer eigenen
 SPIFFS-Partition (siehe `platformio.ini`, `board_build.filesystem = spiffs`)
 und werden vom normalen Firmware-Flash NICHT mit übertragen - nur nötig, wenn
-sich an `data/` etwas ändert (nicht bei jedem Code-Flash). Die Light hat
+sich an `data/` etwas ändert (nicht bei jedem Code-Flash). Die Basis hat
 weder Sprites noch SPIFFS:
 
 ```
@@ -315,7 +322,7 @@ aus diesem Repo per `raw.githubusercontent.com` herunter (kein Backend, kein
 Token nötig - das Repo ist public) und überträgt sie in Chunks
 (`OtaUpdater.h`) direkt per Bluetooth an die Waage. Welche `.bin` die
 richtige ist, sagt die Geräte-Info-Characteristic (`variant`, siehe
-Abschnitt "BLE") - eine S3-Firmware landet also nie auf einer Light. Kein WLAN am Partyort nötig - nur das Handy braucht
+Abschnitt "BLE") - eine S3-Firmware landet also nie auf einer Basis. Kein WLAN am Partyort nötig - nur das Handy braucht
 Internet zum Herunterladen.
 
 Sicherheitsmechanismus: die neue Firmware landet in der inaktiven
@@ -346,7 +353,7 @@ python scripts/release.py
 
 Das baut beide Varianten, kopiert die Binaries nach `firmware/`, rechnet
 Größe + MD5 aus und schreibt beides in `firmware/manifest.json`. Nur eine
-Variante geht auch: `python scripts/release.py light-c3`; der Eintrag der
+Variante geht auch: `python scripts/release.py t-oi-plus`; der Eintrag der
 anderen bleibt dabei erhalten.
 
 3. Committen + auf `main` pushen - die App erkennt das neue Manifest beim
@@ -367,7 +374,7 @@ kaputtgeht.
 
 Nur fuer die Entwicklungsphase, wenn direkt am Code gearbeitet wird (fuer
 fertige Releases an die Party-Waage siehe "Firmware-Update per BLE" oben -
-siehe `src/DevOta.h` fuer den Hintergrund). **Nur grosse Waage:** der Light
+siehe `src/DevOta.h` fuer den Hintergrund). **Nur Vision:** der Basis
 fehlt der zweite Taster fuer die Aktivierung, dort sind alle DevOta-Methoden
 leere Attrappen und der WLAN-Code faellt komplett aus dem Binary.
 

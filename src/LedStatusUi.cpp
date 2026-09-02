@@ -41,7 +41,7 @@ void LedStatusUi::begin() {
     ready_ = true;
     setLevel(0);
 #endif
-    Serial.println("[UI] Status-LED statt Display (Variante Light).");
+    Serial.println("[UI] Status-LED statt Display (Variante Basis).");
     signalStartMs_ = millis();
 }
 
