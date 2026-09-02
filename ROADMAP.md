@@ -233,7 +233,7 @@ Serial Monitor, also am USB-Kabel.
 - Reicht der Umfang der LED-Muster, oder fehlt ein Zustand? Die Zuordnung
   steht in der Tabelle im README ("Was die Status-LED der Light sagt").
 
-**Status:** Nicht begonnen. Die Light selbst läuft (Firmware 1.7.0), das
+**Status:** Nicht begonnen. Die Light selbst läuft (Firmware 1.7.1), das
 hier ist Feinschliff.
 
 ## 7. Mehrere Waagen gleichzeitig an einer App-Instanz
@@ -289,8 +289,8 @@ Gehäuse für die Light, für die es bisher überhaupt keins gibt.
 - Bleibt es bei OpenSCAD (parametrisch, gut versionierbar als Textdatei)
   als Werkzeug?
 - Die Light braucht ein deutlich kleineres Gehäuse ohne Display-Ausschnitt
-  (ESP32-Board im D1-mini-Format statt T-Display S3, dafür ein externer
-  Taster und eine sichtbare Status-LED). Eigener Entwurf oder parametrische
+  (LilyGO T-OI Plus im D1-mini-Format statt T-Display S3, dafür ein externer
+  Taster, eine sichtbare Status-LED und ein Fach für die 16340-Zelle). Eigener Entwurf oder parametrische
   Variante desselben `.scad` - also ein Parameter "Modell" statt zweier
   Dateien, die auseinanderdriften?
 

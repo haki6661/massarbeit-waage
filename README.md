@@ -9,18 +9,19 @@ Board macht alles: Waegezelle auslesen, BLE-Service fuer die Handy-Web-App
 
 | | grosse Waage | Waage Light |
 |---|---|---|
-| Board | LilyGO T-Display S3 (ESP32-S3) | LilyGO T7 v1.3 Mini32 / "mini D1 PLUS" (ESP32) |
+| Board | LilyGO T-Display S3 (ESP32-S3, Xtensa) | LilyGO T-OI Plus V1.3 / "mini D1 PLUS" (ESP32-C3, RISC-V) |
 | Anzeige | 1,9" ST7789-TFT 170x320 | eine Status-LED |
 | Taster | zwei | einer (extern) |
-| Akku | ja | ja (JST-1.25mm + TP4054 an Bord) |
-| Build-Target | `t-display-s3` | `massarbeit-light-t7` |
+| Akku | ja | ja (16340-Halter + Laderegler an Bord) |
+| Build-Target | `t-display-s3` | `massarbeit-light-c3` |
 | BLE-Name | `Massarbeit-Waage` | `Massarbeit-Light` |
 
 Der geteilte Anteil ist gross: Waegezellen-Auswertung, das komplette
 BLE-Protokoll, Firmware-Update per BLE, Kalibrierung und Deep Sleep sind
-identisch - variantenspezifisch sind nur Pins, Anzeige und Tastenanzahl. Weil
-ESP32-S3 und ESP32 verschiedene Chip-Targets sind, koennen die beiden sich
-aber keine `.bin` teilen: es gibt zwei Build-Targets aus einer Codebasis
+identisch - variantenspezifisch sind nur Pins, Anzeige, Tastenanzahl und der
+Weckmechanismus aus dem Deep Sleep. Eine gemeinsame `.bin` kann es trotzdem
+nicht geben: der S3 ist ein Xtensa-Kern, der C3 ein RISC-V - schon die
+Befehlssaetze sind verschieden. Also zwei Build-Targets aus einer Codebasis
 (siehe `include/BoardConfig.h`). Die App dagegen erkennt beim Verbinden
 selbst, welches Modell dranhaengt (Geraete-Info-Characteristic, siehe
 Abschnitt "BLE").
@@ -72,41 +73,51 @@ Das ST7789-Display haengt an einem **8-Bit-Parallelbus** (Intel-8080-Timing),
 nicht an SPI - daher `Arduino_GFX` (`Arduino_ESP32PAR8Q`-Bus) statt
 `TFT_eSPI`/SPI-Displaytreiber.
 
-### Waage Light: LilyGO T7 v1.3 Mini32 ("mini D1 PLUS")
+### Waage Light: LilyGO T-OI Plus V1.3 ("mini D1 PLUS")
 
-ESP32-WROOM-32, 4MB Flash, CH340C, TP4054-Laderegler mit JST-1.25mm-Buchse.
-PlatformIO-Boardprofil `ttgo-t7-v13-mini32`.
+ESP32-C3 (RISC-V), 4MB Flash, CH340C als USB-Serial-Wandler (kein nativer
+USB am Chip - Serial laeuft ueber UART0), Halter fuer eine 16340-Zelle mit
+Laderegler, Power-Schalter, Reset-Taster. PlatformIO-Boardprofil
+`ttgo-t-oi-plus`.
 
 | Zweck | GPIO | Anmerkung |
 |---|---|---|
-| HX711 DOUT / SCK | 25 / 26 | auf der Stiftleiste, kein Strapping-Pin |
-| Taster (extern, gegen GND) | 33 | interner Pullup, kein Widerstand noetig |
-| Status-LED | 22 | Onboard-LED (`LED_BUILTIN` der Arduino-Variante) |
-| Batteriespannung (ADC) | 35 | ADC1_CH7, Onboard-Spannungsteiler (Faktor 2) |
+| HX711 DOUT / SCK | 6 / 7 | auf der Stiftleiste (MTCK/MTDO), kein Strapping-Pin |
+| Taster (extern, gegen GND) | 5 | RTC-faehig -> weckt aus dem Deep Sleep, interner Pullup |
+| Status-LED | 3 | Onboard (`LED_BUILTIN` der Arduino-Variante), nicht herausgefuehrt |
+| Batteriespannung (ADC) | 2 | ADC1_CH2, Onboard-Spannungsteiler (Faktor 2) |
 
-Zwei Randbedingungen bestimmen die Pinwahl - **nicht** umsortieren, ohne sie
-zu pruefen:
+Quellen: [Xinyuan-LilyGO/LilyGo-T-OI-PLUS](https://github.com/Xinyuan-LilyGO/LilyGo-T-OI-PLUS)
+(Pinmap-Bild + `example/battery_voltage`) und die Arduino-Variante
+`ttgo-t-oi-plus` (`BAT_ADC_PIN = 2`, `LED_BUILTIN = 3`).
 
-- **Der Onboard-BOOT-Taster (GPIO0) taugt nicht als Bedientaster.** GPIO0 ist
-  der Strapping-Pin fuer den Flash-Download-Modus; da genau dieser Taster aus
-  dem Deep Sleep aufweckt, waere er beim folgenden Boot zwangslaeufig noch
-  gedrueckt - der Chip wuerde in den Bootloader statt in die Firmware starten
-  (dasselbe Problem wie bei Taste 1 der grossen Waage, siehe `Buttons.h`).
-- **Nur RTC-faehige GPIOs koennen aus dem Deep Sleep aufwecken.** GPIO33 ist
-  RTC-faehig und kein Strapping-Pin; GPIO2/12/15 waeren zwar auch RTC-faehig,
-  sind aber ihrerseits Strapping-Pins.
+Drei Randbedingungen des C3 bestimmen die Pinwahl - **nicht** umsortieren,
+ohne sie zu pruefen:
 
-Zwei Annahmen ueber das Board sind aus den offiziellen Quellen nicht restlos
-belegt und beim ersten Aufbau kurz gegenzupruefen - beide sind einzeilig
-korrigierbar und keine Sackgasse:
+- **Nur GPIO0-5 sind RTC-faehig**, und nur die koennen aus dem Deep Sleep
+  aufwecken. Herausgefuehrt sind davon GPIO2, 4 und 5.
+- **GPIO2/8/9 sind Strapping-Pins** (GPIO8 traegt auf diesem Board sogar den
+  Aufdruck "Boot"). Ein beim Einschalten gedrueckter Taster an so einem Pin
+  koennte den Chip in den Flash-Download-Modus booten statt in die Firmware -
+  und genau das droht, weil derselbe Taster das Geraet aufweckt und beim
+  folgenden Boot noch gedrueckt ist. Bleiben GPIO4 und GPIO5; GPIO5 haengt an
+  ADC2 (mit Funk ohnehin unbrauchbar) und ist damit der bessere Taster-Pin.
+- **GPIO20/21 sind UART0** und gehen an den CH340 - freilassen, sonst ist der
+  Serial-Monitor weg. (GPIO18/19, am C3 sonst der native USB, sind hier frei:
+  das Board fuehrt sie als I2C/Grove heraus.)
 
-- **LED-Polaritaet.** `MASSARBEIT_STATUS_LED_ACTIVE_LOW` steht auf `0` (HIGH
-  schaltet ein). Leuchtet die LED genau invers zu dem, was das Serial-Log
-  sagt: auf `1` aendern.
-- **Batterie-Spannungsteiler.** Sollte die eigene Board-Revision keinen
-  bestueckt haben, meldet `Battery::readPercent()` von selbst "unbekannt"
-  (Plausibilitaetsuntergrenze), und die App blendet die Akkuanzeige aus,
-  statt eine Zahl zu raten.
+Der C3 kennt ausserdem **kein `ext0`**: statt
+`esp_sleep_enable_ext0_wakeup()` weckt ihn
+`esp_deep_sleep_enable_gpio_wakeup()`, und die Aufwach-Ursache heisst
+`ESP_SLEEP_WAKEUP_GPIO` statt `ESP_SLEEP_WAKEUP_EXT0` (siehe
+`enterDeepSleep()`/`setup()` in `main.cpp` - dort werden beide geprueft).
+Auch die `rtc_gpio_*`-Funktionen gibt es auf dem C3 nicht, Pullups laufen
+ueber den normalen GPIO-Treiber.
+
+Eine Annahme ist beim ersten Aufbau kurz gegenzupruefen und einzeilig
+korrigierbar: **die LED-Polaritaet**. `MASSARBEIT_STATUS_LED_ACTIVE_LOW`
+steht auf `0` (HIGH schaltet ein); leuchtet die LED genau invers zu dem, was
+das Serial-Log sagt, auf `1` aendern.
 
 ## Was aus WeighMyBru2 uebernommen wurde
 
@@ -125,7 +136,7 @@ include/
   BoardConfig.h        <- Dispatcher: waehlt das Board-Profil zur Variante
   boards/
     t_display_s3.h       <- Pins + Faehigkeiten der grossen Waage
-    light_t7_mini32.h    <- Pins + Faehigkeiten der Light
+    light_t_oi_plus.h    <- Pins + Faehigkeiten der Light
   Config.h              <- BLE-UUIDs, Kalibrier-Default, Dev-WLAN/OTA-Zugangsdaten
 src/
   main.cpp              <- verdrahtet alle Module
@@ -150,7 +161,7 @@ data/
 firmware/
   manifest.json          <- Version + Groesse + MD5 je Variante
   t-display-s3.bin        <- Release-Binary grosse Waage (App laedt es per BLE)
-  light-t7.bin            <- Release-Binary Light
+  light-c3.bin            <- Release-Binary Light
 ```
 
 ## Bedienung
@@ -231,8 +242,8 @@ unten). Eine weitere Read-Characteristic (`6E40000A-…`) liefert Modell und
 Fähigkeiten als UTF-8-JSON:
 
 ```json
-{"model":"light-t7","name":"Massarbeit Waage Light","fw":"1.7.0",
- "variant":"light-t7",
+{"model":"light-c3","name":"Massarbeit Waage Light","fw":"1.7.1",
+ "variant":"light-c3",
  "caps":{"display":false,"battery":true,"buttons":1,"led":true,"ota":true}}
 ```
 
@@ -273,7 +284,7 @@ pio run -e t-display-s3 -t upload          # grosse Waage, ueber USB-C
 ```
 
 ```
-pio run -e massarbeit-light-t7 -t upload   # Waage Light, ueber USB
+pio run -e massarbeit-light-c3 -t upload   # Waage Light, ueber USB
 ```
 
 ```
@@ -335,7 +346,7 @@ python scripts/release.py
 
 Das baut beide Varianten, kopiert die Binaries nach `firmware/`, rechnet
 Größe + MD5 aus und schreibt beides in `firmware/manifest.json`. Nur eine
-Variante geht auch: `python scripts/release.py light-t7`; der Eintrag der
+Variante geht auch: `python scripts/release.py light-c3`; der Eintrag der
 anderen bleibt dabei erhalten.
 
 3. Committen + auf `main` pushen - die App erkennt das neue Manifest beim
