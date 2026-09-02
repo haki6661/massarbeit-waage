@@ -85,12 +85,23 @@ void BleWeightService::update() {
         Serial.println("[BLE] Client verbunden.");
     }
 
-    if (connected_ && (now - lastNotifyMs_ >= BLE_WEIGHT_NOTIFY_INTERVAL_MS)) {
+    // Waehrend einer Firmware-Uebertragung gehoert die Leitung den Chunks:
+    // schnelleres Verbindungsintervall anfordern und die Gewichts-/Akku-
+    // Notifies pausieren (20 Notifies pro Sekunde konkurrieren sonst mit den
+    // Chunk-Writes um dieselben Verbindungsereignisse, und niemand schaut
+    // waehrend eines Updates auf den Gewichtswert).
+    const bool otaRunning = ota_.isTransferring();
+    if (otaRunning != otaFastLinkActive_) {
+        otaFastLinkActive_ = otaRunning;
+        applyLinkSpeed(otaRunning);
+    }
+
+    if (connected_ && !otaRunning && (now - lastNotifyMs_ >= BLE_WEIGHT_NOTIFY_INTERVAL_MS)) {
         lastNotifyMs_ = now;
         sendWeight(scale_.getCurrentWeight());
     }
 
-    if (connected_ && (now - lastBatteryNotifyMs_ >= BLE_BATTERY_NOTIFY_INTERVAL_MS)) {
+    if (connected_ && !otaRunning && (now - lastBatteryNotifyMs_ >= BLE_BATTERY_NOTIFY_INTERVAL_MS)) {
         lastBatteryNotifyMs_ = now;
         sendBattery(battery_.readPercent());
     }
@@ -126,9 +137,43 @@ void BleWeightService::onConnect(NimBLEServer* /*server*/) {
     connected_ = true;
 }
 
+void BleWeightService::onConnect(NimBLEServer* /*server*/, ble_gap_conn_desc* desc) {
+    connHandle_ = desc->conn_handle;
+}
+
 void BleWeightService::onDisconnect(NimBLEServer* /*server*/) {
     connected_ = false;
+    connHandle_ = BLE_HS_CONN_HANDLE_NONE;
+    otaFastLinkActive_ = false;
     ota_.onClientDisconnected();
+}
+
+/**
+ * Ein Firmware-Chunk wird mit Response geschrieben, kostet also einen
+ * kompletten Round-Trip - die Uebertragungsdauer haengt damit fast linear am
+ * Verbindungsintervall. Die Advertising-Praeferenz (setMinPreferred/
+ * setMaxPreferred in begin()) ist nur ein Hinweis, den Android gern ignoriert
+ * und stattdessen ein sparsames Intervall im 30-50ms-Bereich waehlt; eine
+ * explizite Parameter-Update-Anfrage wird dagegen praktisch immer akzeptiert.
+ * Nur fuer die Dauer der Uebertragung, danach zurueck auf den sparsamen
+ * Normalbetrieb - ein dauerhaft schnelles Intervall kostet Akku.
+ */
+void BleWeightService::applyLinkSpeed(bool fast) {
+    if (!server_ || connHandle_ == BLE_HS_CONN_HANDLE_NONE) return;
+
+    if (fast) {
+        // 7.5-15ms (Einheit 1.25ms), Timeout 4s (Einheit 10ms).
+        server_->updateConnParams(connHandle_, 6, 12, 0, 400);
+        // Data Length Extension: bis 251 statt 27 Byte Nutzlast pro Link-
+        // Layer-Paket - ein 244-Byte-Chunk passt damit in ein einziges Paket
+        // statt in zehn Fragmente.
+        server_->setDataLen(connHandle_, 251);
+        Serial.printf("[BLE] OTA: schnelles Intervall angefordert (MTU=%u).\n", server_->getPeerMTU(connHandle_));
+    } else {
+        // Zurueck auf die in begin() beworbene Praeferenz (7.5-22.5ms).
+        server_->updateConnParams(connHandle_, 6, 18, 0, 400);
+        Serial.println("[BLE] OTA beendet, Verbindungsparameter zurueckgesetzt.");
+    }
 }
 
 void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
