@@ -1,13 +1,13 @@
 # Boot-Sprite-Assets
 
-Pixel-Art-Bootanimation (Tavernen-Charakter trinkt Bier, endet mit dem
-"Maßarbeit"-Schriftzug) - wird von `TftDisplay::playBootSprite()` beim Start
+Bootanimation (Dart fliegt auf eine dunkle Flaeche, endet mit dem
+"MaßArbeit"-Schriftzug) - wird von `TftDisplay::playBootSprite()` beim Start
 gezeigt, parallel zur eigentlichen Initialisierung (siehe `main.cpp`,
 `runNextBootStep()`).
 
 ## Format
 
-- `f000.raw` … `f033.raw`: 34 Frames, je 320×170px, 8-Bit indiziert
+- `f000.raw` … `f046.raw`: 47 Frames, je 320×170px, 8-Bit indiziert
   (1 Byte/Pixel = Palette-Index), roh ohne Header.
 - `pal.raw`: gemeinsame 256-Farben-Palette, 256 × `uint16_t` RGB565
   Little-Endian (512 Byte).
@@ -20,14 +20,14 @@ viele Frames in den verfügbaren Flash-Speicher. Liegt auf SPIFFS (siehe
 Programmcode, weil 50 Frames à 320×170 Byte als Text-Quellcode mehrere MB
 groß wären.
 
-**Frame-Anzahl (34 statt anfangs 50):** SPIFFS' nutzbare Kapazität liegt
-deutlich unter der rohen Partitionsgröße (3,5MB) - Dateisystem-Overhead/
-Wear-Leveling-Reserve. 50 Frames (~2,7MB) passten beim lokalen Bauen des
-Images nicht mehr rein (`SPIFFS_write error(-10001): File system is full`),
-34 Frames (~1,85MB) passen komfortabel. Bei Bedarf mit `STEP` im
-Erzeugungs-Skript (unten) anpassen - `pio run -t uploadfs` schlägt beim
-Bauen des Images fehl, falls es wieder zu voll wird, ohne dass etwas auf
-die Waage geschrieben wird (sicherer Fehlschlag).
+**Frame-Anzahl (47):** SPIFFS' nutzbare Kapazität liegt deutlich unter der
+rohen Partitionsgröße (3,5MB) - Dateisystem-Overhead/Wear-Leveling-Reserve.
+Per Binärsuche mit `pio run -t buildfs` (baut nur das FS-Image lokal, ohne
+Geraet) ermittelt: 47 Frames (~2,55MB) passen, 48 Frames (~2,61MB) schlagen
+mit `SPIFFS_write error(-10001): File system is full` fehl - 47 ist also
+das Maximum. Bei Bedarf mit `FRAME_COUNT` im Erzeugungs-Skript (unten)
+anpassen und die Grenze erneut per `pio run -t buildfs` pruefen, bevor
+`uploadfs` real aufs Geraet schreibt.
 
 **Bewusst flach, kein Unterordner** (nicht `data/boot/…`): SPIFFS' Pfad-
 aufloesung fuer Unterordner ist unzuverlaessig - ein `stat()` auf einen Pfad
@@ -41,19 +41,23 @@ dem echten Geraet trotzdem durchgehend schwarz) - seitdem alles flach unter
 
 ## Herkunft / Neu erzeugen
 
-Quelle: vom Nutzer bereitgestelltes GIF (320×170px, 100 Frames, 10fps,
-Lizenz/Urheberschaft liegt beim Nutzer). Erzeugt mit einem Einmal-Skript
-(nicht Teil des Repos) über Pillow:
+Quelle: vom Nutzer bereitgestelltes GIF `animation/boot.gif` (640×360px,
+101 Frames, 10fps, Lizenz/Urheberschaft liegt beim Nutzer). Erzeugt mit
+einem Einmal-Skript (nicht Teil des Repos) über Pillow:
 
-1. Jeden 3. Frame des Original-GIFs auswählen (0, 3, 6, …, 99 → 34 Frames,
-   `STEP = 3`).
-2. Eine gemeinsame 256-Farben-Palette aus einem Komposit von Start-,
+1. Jeden Frame auf 320×170 skalieren (`Image.resize(..., Image.LANCZOS)`,
+   direkt gestaucht statt Crop - bei diesem dunklen, zentrierten Motiv
+   nicht sichtbar, siehe Diskussion im PR).
+2. `FRAME_COUNT` (47, siehe oben) gleichmäßig über alle Quell-Frames
+   verteilte Indizes auswählen (`round(i * (total-1) / (FRAME_COUNT-1))`),
+   Start- und End-Frame sind dabei garantiert enthalten.
+3. Eine gemeinsame 256-Farben-Palette aus einem Komposit von Start-,
    Mittel- und End-Frame bilden (`Image.quantize(colors=256,
    method=Image.MEDIANCUT)`), damit die Farben über alle Frames konsistent
    bleiben (kein Palette-Flackern).
-3. Jeden ausgewählten Frame mit Floyd-Steinberg-Dithering auf diese Palette
+4. Jeden ausgewählten Frame mit Floyd-Steinberg-Dithering auf diese Palette
    quantisieren, als rohe Index-Bytes speichern.
-4. Palette als RGB565 speichern.
+5. Palette als RGB565 speichern.
 
 Nach Änderungen an den Frames: `pio run -t uploadfs --upload-port <PORT>`
 nicht vergessen - das normale Firmware-Flashen (`-t upload`) überträgt nur
