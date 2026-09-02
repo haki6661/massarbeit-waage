@@ -1,22 +1,22 @@
 {
-  "version": "1.7.1",
+  "version": "1.8.0",
   "file": "firmware/t-display-s3.bin",
   "size": 1032160,
-  "md5": "0a96f926b2a3e337d8e3e94643710693",
+  "md5": "89d9894e2db3e23ebb452522f4bc2f4f",
   "variants": {
     "t-display-s3": {
-      "version": "1.7.1",
-      "name": "Massarbeit Waage",
+      "version": "1.8.0",
+      "name": "Massarbeit Vision",
       "file": "firmware/t-display-s3.bin",
       "size": 1032160,
-      "md5": "0a96f926b2a3e337d8e3e94643710693"
+      "md5": "89d9894e2db3e23ebb452522f4bc2f4f"
     },
-    "light-c3": {
-      "version": "1.7.1",
-      "name": "Massarbeit Waage Light",
-      "file": "firmware/light-c3.bin",
-      "size": 586272,
-      "md5": "0321b8d8eb7a061f6bd2001fc035e099"
+    "t-oi-plus": {
+      "version": "1.8.0",
+      "name": "Massarbeit",
+      "file": "firmware/t-oi-plus.bin",
+      "size": 586064,
+      "md5": "afe6b7e651665b9badb672790c4ee0f6"
     }
   }
 }

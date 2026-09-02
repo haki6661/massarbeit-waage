@@ -135,7 +135,7 @@ sortiert zurückgibt - und jedes Spiel muss das beantworten können:
   Zwischenstands anbieten oder verwerfen?
 - Zeigt die Waage bei der Siegerehrung mit? Dafür bräuchte es einen neuen
   `RemoteCue` und eine Treppchen-Animation im Display-Code - und die
-  Light-Variante hat kein Display, könnte den Moment höchstens über ihre
+  Basisvariante hat kein Display, könnte den Moment höchstens über ihre
   Status-LED andeuten.
 
 **Zur Siegerehrung selbst:** Treppchen mit Platz 1/2/3, die Spieler in
@@ -204,14 +204,14 @@ zurückgestellt und nicht mitgemacht.
   Stellen eingetragen werden. Mit einer Gerät->App-Richtung im Protokoll
   wäre auch der umgekehrte Weg denkbar (App schickt die Spieleliste beim
   Verbinden ans Gerät), dann fiele die doppelte Pflege weg.
-- Gilt nur für die große Waage - die Light-Variante hat kein Display und
+- Gilt nur für die Vision - die Basisvariante hat kein Display und
   damit keine Geräte-Auswahl.
 
 **Status:** Nicht begonnen.
 
-## 6. Waage Light: hörbare Rückmeldung und Kalibrierung ohne Display
+## 6. Basisvariante: hörbare Rückmeldung und Kalibrierung ohne Display
 
-**Idee:** Zwei offene Enden aus dem Bau der Light (siehe `LedStatusUi.cpp`
+**Idee:** Zwei offene Enden aus dem Bau der Basis (siehe `LedStatusUi.cpp`
 und `CalibrationRoutine.h`), die bewusst erst einmal minimal gelöst wurden.
 
 **Warum:** Die Status-LED trägt die Zustände zwar zuverlässig, aber sie
@@ -221,7 +221,7 @@ Serial Monitor, also am USB-Kabel.
 
 **Offene Fragen, noch nicht entschieden:**
 
-- Soll die Light Ereignisse zusätzlich über einen Piezo/Summer quittieren
+- Soll die Basis Ereignisse zusätzlich über einen Piezo/Summer quittieren
   (hörbar statt sichtbar)? Ein kurzer Ton beim Volltreffer/Fehlschlag käme
   auch dann an, wenn gerade niemand auf die Waage schaut. Kostet einen
   weiteren freien GPIO und ein Bauteil.
@@ -231,9 +231,9 @@ Serial Monitor, also am USB-Kabel.
   Alltagsfall schon ab - die Firmware-Grundkalibrierung braucht man aber
   weiterhin einmal je Gerät.
 - Reicht der Umfang der LED-Muster, oder fehlt ein Zustand? Die Zuordnung
-  steht in der Tabelle im README ("Was die Status-LED der Light sagt").
+  steht in der Tabelle im README ("Was die Status-LED der Basis sagt").
 
-**Status:** Nicht begonnen. Die Light selbst läuft (Firmware 1.7.1), das
+**Status:** Nicht begonnen. Die Basis selbst läuft (Firmware 1.7.1), das
 hier ist Feinschliff.
 
 ## 7. Mehrere Waagen gleichzeitig an einer App-Instanz
@@ -241,7 +241,7 @@ hier ist Feinschliff.
 **Idee:** Mehr als eine Waage an dieselbe laufende App hängen - für mehrere
 Tische/Gruppen auf derselben Party.
 
-**Warum:** Erst durch die billige Light ist "mehrere Waagen" überhaupt eine
+**Warum:** Erst durch die billige Basis ist "mehrere Waagen" überhaupt eine
 realistische Anschaffung. Solange eine Waage der Preis eines T-Display S3
 war, stellte sich die Frage praktisch nicht.
 
@@ -267,14 +267,14 @@ Waage gemeint ist.
 - Reicht der Durchsatz? Jede Waage schickt 20 Gewichts-Notifies pro Sekunde.
 
 **Status:** Nicht begonnen. Deutlich größere Ausbaustufe als es zunächst
-klingt - hier notiert, weil die Light sie überhaupt erst realistisch macht.
+klingt - hier notiert, weil die Basis sie überhaupt erst realistisch macht.
 
-## 8. Neue Gehäuse entwerfen und drucken (große Waage und Light)
+## 8. Neue Gehäuse entwerfen und drucken (Vision und Basis)
 
-**Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die große Waage, statt
+**Idee:** Ein anderes/neues 3D-druckbares Gehäuse für die Vision, statt
 des aktuellen Stands in `cad/` (`massarbeit_waage_case.scad` +
 `massarbeit_waage_base.stl`/`massarbeit_waage_platform.stl`) - und ein
-Gehäuse für die Light, für die es bisher überhaupt keins gibt.
+Gehäuse für die Basis, für die es bisher überhaupt keins gibt.
 
 **Referenz/Inspiration:** [Smart DIY Kitchen Scale for Precision Cooking (instructables.com)](https://www.instructables.com/Smart-DIY-Kitchen-Scale-for-Precision-Cooking/)
 
@@ -288,7 +288,7 @@ Gehäuse für die Light, für die es bisher überhaupt keins gibt.
   `massarbeit_waage_case.scad`?
 - Bleibt es bei OpenSCAD (parametrisch, gut versionierbar als Textdatei)
   als Werkzeug?
-- Die Light braucht ein deutlich kleineres Gehäuse ohne Display-Ausschnitt
+- Die Basis braucht ein deutlich kleineres Gehäuse ohne Display-Ausschnitt
   (LilyGO T-OI Plus im D1-mini-Format statt T-Display S3, dafür ein externer
   Taster, eine sichtbare Status-LED und ein Fach für die 16340-Zelle). Eigener Entwurf oder parametrische
   Variante desselben `.scad` - also ein Parameter "Modell" statt zweier

@@ -14,7 +14,7 @@
 #include "DevOta.h"
 
 Scale scale(Pins::HX711_DOUT, Pins::HX711_SCK, DEFAULT_CALIBRATION_FACTOR);
-// TFT (grosse Waage) oder Status-LED (Light) - siehe DeviceUi.h.
+// TFT (Vision) oder Status-LED (Basis) - siehe DeviceUi.h.
 DeviceUi ui;
 Battery battery;
 BleWeightService bleService(scale, ui, battery);
@@ -42,7 +42,7 @@ bool activityBaselineSet = false;
 #if MASSARBEIT_BUTTON_COUNT >= 2
 
 // Taste 1 kurz: Geraete-Spielauswahl, naechste Option. Tara gibt es auf der
-// grossen Waage als eigene Tastenfunktion nicht mehr - es laeuft automatisch
+// Vision als eigene Tastenfunktion nicht mehr - es laeuft automatisch
 // (Auto-Zero-Nachfuehrung, siehe Scale.cpp) oder ueber die App
 // (BLE-Kommando 0x01).
 void onButton1Click() {
@@ -60,9 +60,9 @@ void onButton2Click() {
 
 #else
 
-// Light: nur ein Taster, und ohne Display gibt es keine Geraete-Spielauswahl
+// Basis: nur ein Taster, und ohne Display gibt es keine Geraete-Spielauswahl
 // zum Durchschalten - der kurze Klick ist damit frei und uebernimmt Tara
-// (auf der grossen Waage die einzige Tastenfunktion, die weggefallen ist).
+// (auf der Vision die einzige Tastenfunktion, die weggefallen ist).
 void onButton1Click() {
     Serial.println("[Button] Kurzer Klick: Tara.");
     scale.tare();
@@ -82,14 +82,14 @@ void onSleepLongPress() {
 }
 
 // Versetzt die Waage in Deep Sleep (~wenige µA statt 60-150+ mA aktiv).
-// Aufwachen NUR ueber Pins::WAKEUP_BUTTON (Board-Profil): auf der grossen
-// Waage Taste 2 (GPIO14), auf der Light der einzige Taster (GPIO5). Beide
+// Aufwachen NUR ueber Pins::WAKEUP_BUTTON (Board-Profil): auf der Vision
+// Taste 2 (GPIO14), auf der Basis der einzige Taster (GPIO5). Beide
 // sind bewusst KEIN Strapping-Pin - waere so einer beim Aufwach-Boot noch
 // gedrueckt, koennte der Chip statt der Firmware in den Flash-Download-Modus
 // starten (deshalb scheiden GPIO0 am S3 und GPIO2/8/9 am C3 aus).
 //
 // Der Weckmechanismus selbst unterscheidet sich: ext0 gibt es nur auf
-// ESP32/ESP32-S3, der C3 der Light kann stattdessen ueber
+// ESP32/ESP32-S3, der C3 der Basis kann stattdessen ueber
 // esp_deep_sleep_enable_gpio_wakeup() geweckt werden (beides nur mit
 // RTC-faehigen Pins, siehe Board-Profile).
 // Nach dem Aufwachen laeuft die komplette Firmware (setup()) neu durch -
@@ -189,7 +189,7 @@ void setup() {
                    ESP.getChipModel(), ESP.getChipRevision(), ESP.getFreeHeap());
 
     // Beide moeglichen Ursachen pruefen, statt sie per #if auseinanderzu-
-    // halten: ext0 meldet der S3, ESP_SLEEP_WAKEUP_GPIO der C3 der Light.
+    // halten: ext0 meldet der S3, ESP_SLEEP_WAKEUP_GPIO der C3 der Basis.
     esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
     bool wokeFromSleep = wakeupCause == ESP_SLEEP_WAKEUP_EXT0 || wakeupCause == ESP_SLEEP_WAKEUP_GPIO;
     if (wokeFromSleep) {
@@ -211,8 +211,8 @@ void setup() {
     ui.begin();
 
     // Kein Text-Zwischenscreen mehr davor ("Starte...") - die Startsequenz
-    // (Sprite-Animation auf der grossen Waage, atmende Status-LED auf der
-    // Light) laeuft direkt los und erledigt die eigentliche Initialisierung
+    // (Sprite-Animation auf der Vision, atmende Status-LED auf der
+    // Basis) laeuft direkt los und erledigt die eigentliche Initialisierung
     // (battery/buttons/scale/BLE, siehe runNextBootStep() oben) parallel
     // dazu, statt hinterher eine feste Dauer draufzuschlagen.
     ui.runBootSequence(runNextBootStep);

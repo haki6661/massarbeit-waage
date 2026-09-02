@@ -1,7 +1,7 @@
 #pragma once
 
 // Waehlt die Geraete-Anzeige passend zur gebauten Variante aus: TFT-Vollbild
-// (grosse Waage) oder Status-LED (Light). Alles, was "irgendwas anzeigen"
+// (Vision) oder Status-LED (Basis). Alles, was "irgendwas anzeigen"
 // will - main.cpp, BleWeightService, CalibrationRoutine - nimmt ab hier
 // `DeviceUi&` statt `TftDisplay&` und muss die Variante nicht kennen.
 //

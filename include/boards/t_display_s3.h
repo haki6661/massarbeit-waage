@@ -1,6 +1,6 @@
 #pragma once
 
-// Board-Profil "Pro": LilyGO T-Display S3 - die grosse Waage mit TFT.
+// Board-Profil "Pro": LilyGO T-Display S3 - die Vision mit TFT.
 // Quelle: offizielles Repo https://github.com/Xinyuan-LilyGO/T-Display-S3
 // (README-Pinout-Tabelle) - NICHT von einem generischen ESP32-S3-Devkit
 // oder von WeighMyBru2s esp32s3-supermini/xiao-Pins uebernehmen, beide
@@ -15,8 +15,8 @@
 // gemeldet, damit sie sich zur Laufzeit auf das Modell einstellen kann
 // (siehe BleWeightService::buildDeviceInfoJson()).
 #define MASSARBEIT_MODEL_ID        "t-display-s3"
-#define MASSARBEIT_MODEL_NAME      "Massarbeit Waage"
-#define MASSARBEIT_BLE_NAME        "Massarbeit-Waage"
+#define MASSARBEIT_MODEL_NAME      "Massarbeit Vision"
+#define MASSARBEIT_BLE_NAME        "Massarbeit-Vision"
 #define MASSARBEIT_HAS_TFT         1
 #define MASSARBEIT_HAS_STATUS_LED  0
 #define MASSARBEIT_STATUS_LED_RGB  0
@@ -25,7 +25,7 @@
 #define MASSARBEIT_HAS_POWER_ON    1
 #define MASSARBEIT_HAS_DEV_OTA     1
 
-// Der S3 kann per ext0 aus dem Deep Sleep geweckt werden (der C3 der Light
+// Der S3 kann per ext0 aus dem Deep Sleep geweckt werden (der C3 der Basis
 // nicht, siehe dortiges Profil).
 #define MASSARBEIT_WAKEUP_USES_EXT0 1
 

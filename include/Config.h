@@ -12,7 +12,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.7.1"
+#define FIRMWARE_VERSION "1.8.0"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -25,8 +25,8 @@
 // bestehende App (z.B. Bean Conqueror) das Geraet zufaellig schon lesen kann.
 // ============================================================================
 
-// Je Variante ein eigener Name (siehe Board-Profil), damit die grosse Waage
-// und die Light im Bluetooth-Dialog des Handys auseinanderzuhalten sind.
+// Je Variante ein eigener Name (siehe Board-Profil), damit die Vision
+// und die Basis im Bluetooth-Dialog des Handys auseinanderzuhalten sind.
 #define BLE_DEVICE_NAME MASSARBEIT_BLE_NAME
 
 #define BLE_SERVICE_UUID        "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -38,14 +38,14 @@
 // Geraete-Info: read-only, UTF-8-JSON - der Kern der App-seitigen
 // Modellerkennung. Die App liest die Characteristic einmal beim Verbinden und
 // stellt ihre Oberflaeche darauf ein (siehe DeviceInfo/WeightSource im
-// App-Repo). Inhalt, hier am Beispiel der Light:
-//   {"model":"light-c3","name":"Massarbeit Waage Light","fw":"1.7.1",
-//    "variant":"light-c3",
+// App-Repo). Inhalt, hier am Beispiel der Basis:
+//   {"model":"t-oi-plus","name":"Massarbeit","fw":"1.8.0",
+//    "variant":"t-oi-plus",
 //    "caps":{"display":false,"battery":true,"buttons":1,"led":true,"ota":true}}
 // JSON statt einer kompakten Byte-Bitmaske ist Absicht: es laesst sich um ein
 // Feld erweitern, ohne dass App und Firmware gleichzeitig aktualisiert werden
 // muessen. Auf der Firmware reicht dafuer ein snprintf, kein Parser.
-// Fehlt die Characteristic (aeltere Firmware), nimmt die App "grosse Waage mit
+// Fehlt die Characteristic (aeltere Firmware), nimmt die App "Vision mit
 // Display" an - alte Geraete funktionieren unveraendert weiter.
 #define BLE_DEVICE_INFO_CHAR_UUID "6E40000A-B5A3-F393-E0A9-E50E24DCCA9E" // read, UTF-8-JSON
 
@@ -94,7 +94,7 @@
 //                       abgeschnitten).
 //   0x15               Zug beendet / kein aktiver Spieler - Badge weg.
 // 0x10-0x15 loesen KEINE eigene Gewichtslogik aus, sie steuern nur, was die
-// Geraeteanzeige gerade zeigt (TFT-Vollbild bzw. LED-Muster auf der Light) -
+// Geraeteanzeige gerade zeigt (TFT-Vollbild bzw. LED-Muster auf der Basis) -
 // die Waage selbst weiss nichts vom Spielzustand, die App entscheidet und
 // schickt nur das Anzeige-Kommando.
 //
@@ -108,7 +108,7 @@
 // Kalibrierung
 // ----------------------------------------------------------------------------
 // Platzhalter - ungueltig fuer die 3kg-Single-Point-Zelle! Muss ueber die
-// Kalibrierroutine (grosse Waage: Taste 2 lang; Light: Doppelklick) mit einem
+// Kalibrierroutine (Vision: Taste 2 lang; Basis: Doppelklick) mit einem
 // bekannten Referenzgewicht neu ermittelt werden. Danach wird der echte Wert
 // automatisch im NVS (Preferences, Namespace "scale") gespeichert und dieser
 // Platzhalter nicht mehr benutzt.
@@ -140,8 +140,8 @@
 // Taste 1 LANG druecken (siehe Buttons.h) -> sofort in Deep Sleep. Zusaetzlich
 // automatisch nach AUTO_SLEEP_TIMEOUT_MS ohne Gewichtsaenderung UND ohne
 // Tastendruck. Aufwachen ueber Pins::WAKEUP_BUTTON aus dem Board-Profil: auf
-// der grossen Waage Taste 2 (GPIO14), nicht Taste 1/GPIO0 (Strapping-Pin,
-// siehe main.cpp); auf der Light der einzige Taster (GPIO33, ebenfalls kein
+// der Vision Taste 2 (GPIO14), nicht Taste 1/GPIO0 (Strapping-Pin,
+// siehe main.cpp); auf der Basis der einzige Taster (GPIO33, ebenfalls kein
 // Strapping-Pin).
 // ============================================================================
 #define AUTO_SLEEP_TIMEOUT_MS (10UL * 60UL * 1000UL) // 10 Minuten

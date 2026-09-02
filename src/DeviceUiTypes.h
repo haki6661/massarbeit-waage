@@ -1,9 +1,9 @@
 #pragma once
 
-// Anzeige-Zustaende, die BEIDE Geraetevarianten kennen - die grosse Waage
-// zeigt sie als Vollbild auf dem TFT (TftDisplay), die Light als Blink-/
+// Anzeige-Zustaende, die BEIDE Geraetevarianten kennen - die Vision
+// zeigt sie als Vollbild auf dem TFT (TftDisplay), die Basis als Blink-/
 // Helligkeitsmuster auf ihrer Status-LED (LedStatusUi). Bewusst in einer
-// eigenen Datei ohne Arduino_GFX-Abhaengigkeit, damit der Light-Build (der
+// eigenen Datei ohne Arduino_GFX-Abhaengigkeit, damit der Basis-Build (der
 // die GFX-Library gar nicht dabei hat) sie ebenfalls einbinden kann.
 //
 // Welche Implementierung dahintersteht, waehlt DeviceUi.h aus.
@@ -11,9 +11,9 @@
 #include <Arduino.h>
 
 // Lokaler Anzeige-Zustand, wenn WEDER ein RemoteCue laeuft NOCH ein Spieler
-// am Zug ist - die Waage ist "zwischen Spielen". Auf der grossen Waage ist
+// am Zug ist - die Waage ist "zwischen Spielen". Auf der Vision ist
 // das die Geraete-Spielauswahl: Taste 1 kurz schaltet durch die Spieleliste,
-// Taste 2 kurz bestaetigt. Die Light hat mangels Display keine Auswahl.
+// Taste 2 kurz bestaetigt. Die Basis hat mangels Display keine Auswahl.
 enum class LocalScreen {
     GamePicker,     // "<Icon> <Name>", Taste 1/2-Hinweis
     GameConfirmed,  // "<Name> ausgewaehlt - jetzt in der App oeffnen"
