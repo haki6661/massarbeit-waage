@@ -39,6 +39,10 @@ public:
     // registriert, unterscheidet ueber Pointer-Vergleich in onWrite().
     void onWrite(NimBLECharacteristic* characteristic) override;
 
+    // Laeuft gerade eine Uebertragung? BleWeightService haelt der dann die
+    // Leitung frei (schnelles Verbindungsintervall, keine Gewichts-Notifies).
+    bool isTransferring() const { return state_ == State::InProgress; }
+
 private:
     enum class State : uint8_t { Idle = 0, InProgress = 1, Success = 2, Error = 3 };
     enum class ErrorCode : uint8_t {

@@ -34,6 +34,10 @@ public:
 
     // NimBLEServerCallbacks
     void onConnect(NimBLEServer* server) override;
+    // Zweite Overload-Variante: NimBLE ruft beide auf (siehe NimBLEServer.cpp,
+    // BLE_GAP_EVENT_CONNECT) - nur ueber diese kommen wir an den Conn-Handle,
+    // den updateConnParams()/setDataLen() brauchen.
+    void onConnect(NimBLEServer* server, ble_gap_conn_desc* desc) override;
     void onDisconnect(NimBLEServer* server) override;
 
     // NimBLECharacteristicCallbacks (Command-Characteristic)
@@ -62,7 +66,12 @@ private:
     bool wasConnected_ = false;
     uint32_t lastNotifyMs_ = 0;
     uint32_t lastBatteryNotifyMs_ = 0;
+    uint16_t connHandle_ = BLE_HS_CONN_HANDLE_NONE;
+    bool otaFastLinkActive_ = false;
 
     void sendWeight(float grams);
     void sendBattery(int8_t percent);
+    // Schaltet die Verbindung fuer die Dauer einer Firmware-Uebertragung auf
+    // Durchsatz statt auf Sparsamkeit (siehe Implementierung).
+    void applyLinkSpeed(bool fast);
 };
