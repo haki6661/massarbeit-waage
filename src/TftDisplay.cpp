@@ -304,7 +304,7 @@ void TftDisplay::renderWaitingForTurnScreen(bool hx711Connected, bool bleConnect
 void TftDisplay::playBootSprite(bool (*stepInit)()) {
     constexpr int16_t SPRITE_W = 320;
     constexpr int16_t SPRITE_H = 170;
-    constexpr uint8_t FRAME_COUNT = 34;
+    constexpr uint8_t FRAME_COUNT = 47;
 
     // Fehlende Palette/Frames (z.B. nach einem BLE-Update von einer alten
     // Firmware, die noch kein data/ auf SPIFFS geschrieben hat - ein
