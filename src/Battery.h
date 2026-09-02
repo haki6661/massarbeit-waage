@@ -2,10 +2,14 @@
 
 #include <Arduino.h>
 
-// Batteriespannung ueber den werksseitig kalibrierten ADC-Pfad des ESP32-S3
+// Batteriespannung ueber den werksseitig kalibrierten ADC-Pfad des ESP32
 // lesen. Formel 1:1 aus LilyGOs offiziellem Beispiel uebernommen
 // (Xinyuan-LilyGO/T-Display-S3, examples/GetBatteryVoltage) - nicht die
 // naive analogRead()*3.3/4095-Rechnung, die deutlich ungenauer waere.
+//
+// Gilt unveraendert fuer beide Geraetevarianten: ADC-Pin und Teilerfaktor
+// kommen aus dem Board-Profil (Pins::BATTERY_ADC,
+// MASSARBEIT_BATTERY_DIVIDER), der Rest ist identisch.
 class Battery {
 public:
     void begin();

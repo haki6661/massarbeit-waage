@@ -10,6 +10,11 @@
 // Aktivierung nur, wenn Taste 2 beim Booten gehalten wird - im normalen
 // Party-Betrieb bleibt WLAN dadurch komplett aus (Akkuschonung, und die
 // Waage muss beim Trinkspiel nicht in Reichweite eines bekannten WLANs sein).
+//
+// Nur auf der grossen Waage (MASSARBEIT_HAS_DEV_OTA): der Light fehlt der
+// zweite Taster fuer die Aktivierung, und Updates laufen dort ohnehin per
+// BLE aus der App. Dort sind alle Methoden leere Attrappen (siehe
+// DevOta.cpp), damit main.cpp ohne #if auskommt.
 class DevOta {
 public:
     // Frueh in setup() aufrufen (vor allem anderen, das GPIO14 anfasst).

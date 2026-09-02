@@ -1,5 +1,9 @@
 #pragma once
 
+// Fuer MASSARBEIT_BLE_NAME/-MODEL_* (BLE-Geraetename und Geraete-Info sind
+// variantenabhaengig, siehe include/boards/).
+#include "BoardConfig.h"
+
 // ============================================================================
 // Firmware-Version
 // ----------------------------------------------------------------------------
@@ -8,7 +12,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.6.0"
+#define FIRMWARE_VERSION "1.7.0"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -21,13 +25,29 @@
 // bestehende App (z.B. Bean Conqueror) das Geraet zufaellig schon lesen kann.
 // ============================================================================
 
-#define BLE_DEVICE_NAME "Massarbeit-Waage"
+// Je Variante ein eigener Name (siehe Board-Profil), damit die grosse Waage
+// und die Light im Bluetooth-Dialog des Handys auseinanderzuhalten sind.
+#define BLE_DEVICE_NAME MASSARBEIT_BLE_NAME
 
 #define BLE_SERVICE_UUID        "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_WEIGHT_CHAR_UUID    "6E400004-B5A3-F393-E0A9-E50E24DCCA9E" // read+notify, float32 LE, Gramm
 #define BLE_COMMAND_CHAR_UUID   "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_BATTERY_CHAR_UUID   "6E400005-B5A3-F393-E0A9-E50E24DCCA9E" // read+notify, 1 Byte: 0-100 = Prozent, 0xFF = unbekannt (USB gesteckt, siehe Battery::readPercent())
 #define BLE_VERSION_CHAR_UUID   "6E400006-B5A3-F393-E0A9-E50E24DCCA9E" // read, UTF-8-String (FIRMWARE_VERSION)
+
+// Geraete-Info: read-only, UTF-8-JSON - der Kern der App-seitigen
+// Modellerkennung. Die App liest die Characteristic einmal beim Verbinden und
+// stellt ihre Oberflaeche darauf ein (siehe DeviceInfo/WeightSource im
+// App-Repo). Inhalt, hier am Beispiel der Light:
+//   {"model":"light-t7","name":"Massarbeit Waage Light","fw":"1.7.0",
+//    "variant":"light-t7",
+//    "caps":{"display":false,"battery":true,"buttons":1,"led":true,"ota":true}}
+// JSON statt einer kompakten Byte-Bitmaske ist Absicht: es laesst sich um ein
+// Feld erweitern, ohne dass App und Firmware gleichzeitig aktualisiert werden
+// muessen. Auf der Firmware reicht dafuer ein snprintf, kein Parser.
+// Fehlt die Characteristic (aeltere Firmware), nimmt die App "grosse Waage mit
+// Display" an - alte Geraete funktionieren unveraendert weiter.
+#define BLE_DEVICE_INFO_CHAR_UUID "6E40000A-B5A3-F393-E0A9-E50E24DCCA9E" // read, UTF-8-JSON
 
 // Firmware-Update per BLE (siehe OtaUpdater.h) - loest die geplante
 // WLAN-freie Ablösung des reinen Entwicklungs-OTA (siehe Abschnitt weiter
@@ -59,7 +79,7 @@
 //                       ("Abschlag") - laeuft als Endlos-Animation, bis
 //                       0x10/0x12 kommt. Welche Animation (Ball/Pfeil/Karte/
 //                       Block) haengt von <gameId> ab, siehe GameKind in
-//                       TftDisplay.h. Wird gesendet, wenn useSipDetector
+//                       DeviceUiTypes.h. Wird gesendet, wenn useSipDetector
 //                       (App) einen zu grossen Gewichtsabfall erkennt, um
 //                       ihn NICHT als normalen Schluck zu werten, sondern
 //                       als "Glas weg, wird woanders getrunken" - die
@@ -68,16 +88,17 @@
 //   0x14 <gameId><r><g><b><nameLen><name>
 //                       Zug gestartet: aktiver Spieler + Spiel fuers
 //                       Display (Namens-/Farb-Badge oben auf dem Gewichts-
-//                       screen, siehe TftDisplay::setActivePlayer()).
+//                       screen, siehe DeviceUi::setActivePlayer()).
 //                       <nameLen> = Anzahl der folgenden UTF-8-Bytes
 //                       (auf dem Display ohnehin auf ca. 10 Zeichen
 //                       abgeschnitten).
 //   0x15               Zug beendet / kein aktiver Spieler - Badge weg.
-// 0x10-0x15 loesen KEINE eigene Gewichtslogik aus, sie steuern nur, was
-// TftDisplay gerade zeigt - die Waage selbst weiss nichts vom Spielzustand,
-// die App entscheidet und schickt nur das Anzeige-Kommando.
+// 0x10-0x15 loesen KEINE eigene Gewichtslogik aus, sie steuern nur, was die
+// Geraeteanzeige gerade zeigt (TFT-Vollbild bzw. LED-Muster auf der Light) -
+// die Waage selbst weiss nichts vom Spielzustand, die App entscheidet und
+// schickt nur das Anzeige-Kommando.
 //
-// GameKind-Werte fuer <gameId> (0x13/0x14, siehe TftDisplay.h):
+// GameKind-Werte fuer <gameId> (0x13/0x14, siehe DeviceUiTypes.h):
 //   0 = keins/generisch, 1 = Golf, 2 = Dart, 3 = Blackjack, 4 = Tower, 5 = Scale, 6 = Boxen
 
 #define BLE_WEIGHT_NOTIFY_INTERVAL_MS 50 // 20x/s, wie im WeighMyBru2-Original
@@ -87,10 +108,10 @@
 // Kalibrierung
 // ----------------------------------------------------------------------------
 // Platzhalter - ungueltig fuer die 3kg-Single-Point-Zelle! Muss ueber die
-// Kalibrierroutine (Taste 2 lang druecken) mit einem bekannten Referenz-
-// gewicht neu ermittelt werden. Danach wird der echte Wert automatisch im
-// NVS (Preferences, Namespace "scale") gespeichert und dieser Platzhalter
-// nicht mehr benutzt.
+// Kalibrierroutine (grosse Waage: Taste 2 lang; Light: Doppelklick) mit einem
+// bekannten Referenzgewicht neu ermittelt werden. Danach wird der echte Wert
+// automatisch im NVS (Preferences, Namespace "scale") gespeichert und dieser
+// Platzhalter nicht mehr benutzt.
 // ============================================================================
 #define DEFAULT_CALIBRATION_FACTOR 1.0f
 
@@ -118,8 +139,10 @@
 // ----------------------------------------------------------------------------
 // Taste 1 LANG druecken (siehe Buttons.h) -> sofort in Deep Sleep. Zusaetzlich
 // automatisch nach AUTO_SLEEP_TIMEOUT_MS ohne Gewichtsaenderung UND ohne
-// Tastendruck. Aufwachen immer ueber Taste 2 (GPIO14), siehe main.cpp fuer
-// die Begruendung (Taste 1/GPIO0 ist ein Strapping-Pin).
+// Tastendruck. Aufwachen ueber Pins::WAKEUP_BUTTON aus dem Board-Profil: auf
+// der grossen Waage Taste 2 (GPIO14), nicht Taste 1/GPIO0 (Strapping-Pin,
+// siehe main.cpp); auf der Light der einzige Taster (GPIO33, ebenfalls kein
+// Strapping-Pin).
 // ============================================================================
 #define AUTO_SLEEP_TIMEOUT_MS (10UL * 60UL * 1000UL) // 10 Minuten
 #define SLEEP_ACTIVITY_THRESHOLD_G 1.0f // Gewichtsaenderung, die den Inaktivitaets-Timer zuruecksetzt

@@ -8,22 +8,39 @@ namespace {
 }
 
 void Battery::begin() {
+#if MASSARBEIT_HAS_BATTERY
     // Nutzt die werksseitige ADC-Kalibrierkurve des Chips statt einer
     // linearen Naeherung (Vref-Default 1100mV, wie im offiziellen Beispiel).
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adcChars);
+#endif
 }
 
 float Battery::readVoltage() {
+#if !MASSARBEIT_HAS_BATTERY
+    return 0.0f; // Board ohne Akkumessung - siehe Board-Profil
+#else
     uint32_t raw = analogRead(Pins::BATTERY_ADC);
-    // Spannungsteiler-Faktor 2, siehe offizielles GetBatteryVoltage-Beispiel.
-    uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adcChars) * 2;
+    // Spannungsteiler vor dem ADC (beide Boards: Faktor 2), siehe
+    // MASSARBEIT_BATTERY_DIVIDER im Board-Profil.
+    uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adcChars) * MASSARBEIT_BATTERY_DIVIDER;
 
     if (millivolts > 4300) {
-        // Kein Akku angeschlossen / USB-C gesteckt -> ADC sieht nur die
-        // TP4056-Ladespannung, kein verlaesslicher Zellwert.
+        // Kein Akku angeschlossen / USB gesteckt -> ADC sieht nur die
+        // Ladespannung des Ladereglers, kein verlaesslicher Zellwert.
+        return 0.0f;
+    }
+    if (millivolts < 2500) {
+        // Unterhalb der Entladeschlussspannung einer 1S-Zelle (~3.0V) mit
+        // Sicherheitsabstand: entweder haengt kein Akku dran, oder das Board
+        // hat den erwarteten Spannungsteiler gar nicht bestueckt und der
+        // ADC-Pin haengt in der Luft. Beides ist "kein verlaesslicher Wert" -
+        // lieber gar nichts melden (-> 0xFF, App blendet die Anzeige aus) als
+        // eine erfundene Zahl. Ein wirklich so leerer Akku haette den ESP32
+        // ohnehin laengst abgeschaltet.
         return 0.0f;
     }
     return millivolts / 1000.0f;
+#endif
 }
 
 int8_t Battery::readPercent() {
