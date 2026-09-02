@@ -41,7 +41,15 @@ void BleWeightService::begin() {
     versionChar_ = service->createCharacteristic(
         BLE_VERSION_CHAR_UUID,
         NIMBLE_PROPERTY::READ);
-    versionChar_->setValue(FIRMWARE_VERSION);
+    // Explizit als Bytes+Laenge, NICHT ueber die Template-Ueberladung:
+    // NimBLECharacteristic::setValue(const T&) reicht an
+    // NimBLEAttValue::setValue<T>() mit explizitem Template-Argument weiter
+    // und umgeht damit die const-char*-Ueberladung. Fuer ein String-LITERAL
+    // (Array) ginge das gerade noch gut (sizeof = Arraylaenge, inkl.
+    // abschliessender Null), fuer einen const char* aber nicht - dann
+    // landeten sizeof(pointer) = 4 Byte Adresse in der Characteristic.
+    // Siehe den Kommentar bei deviceInfoChar_ weiter unten.
+    versionChar_->setValue(reinterpret_cast<const uint8_t*>(FIRMWARE_VERSION), strlen(FIRMWARE_VERSION));
 
     // Modell + Faehigkeiten als JSON (siehe BLE_DEVICE_INFO_CHAR_UUID in
     // Config.h). Die App liest das beim Verbinden einmal und entscheidet
@@ -49,8 +57,18 @@ void BleWeightService::begin() {
     deviceInfoChar_ = service->createCharacteristic(
         BLE_DEVICE_INFO_CHAR_UUID,
         NIMBLE_PROPERTY::READ);
+    // ACHTUNG, hier lag ein Fehler: setValue(deviceInfo.c_str()) sieht
+    // richtig aus, schreibt aber 4 Byte Zeigeradresse statt des JSON.
+    // NimBLECharacteristic::setValue(const T&) ruft
+    // NimBLEAttValue::setValue<T>(s) mit EXPLIZITEM Template-Argument auf;
+    // damit kommt die passende `const char*`-Ueberladung (die strlen()
+    // benutzt) gar nicht mehr in Frage, und es greift das Fallback-Template
+    // "Typ ohne c_str()" -> memcpy(&s, sizeof(T)). Die App las daraufhin
+    // Datenmuell, JSON.parse() scheiterte und sie fiel auf ihre Annahme
+    // "Vision mit Display" zurueck - eine Basis meldete sich also als Vision.
+    // Deshalb immer die eindeutige Bytes+Laenge-Ueberladung nehmen.
     String deviceInfo = buildDeviceInfoJson();
-    deviceInfoChar_->setValue(deviceInfo.c_str());
+    deviceInfoChar_->setValue(reinterpret_cast<const uint8_t*>(deviceInfo.c_str()), deviceInfo.length());
     Serial.printf("[BLE] Geraete-Info: %s\n", deviceInfo.c_str());
 
     // Firmware-Update per BLE (siehe OtaUpdater.h) - WRITE statt WRITE_NR fuer

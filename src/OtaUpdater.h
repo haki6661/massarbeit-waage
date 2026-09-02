@@ -52,6 +52,7 @@ private:
         Md5Mismatch = 3,
         WriteFailed = 4,
         Aborted = 5,
+        ChipMismatch = 6,
     };
 
     NimBLECharacteristic* controlChar_ = nullptr;
@@ -65,6 +66,20 @@ private:
     uint32_t lastDataMs_ = 0;
     uint32_t successAtMs_ = 0;
     uint8_t lastNotifiedPercent_ = 0xFF;
+
+    // Die ersten 16 Byte der uebertragenen Firmware (esp_image_header_t) -
+    // ueber mehrere Chunks hinweg gesammelt, um daraus die Chip-Kennung zu
+    // pruefen (siehe imageMatchesThisChip()).
+    uint8_t imageHeader_[16] = {};
+    uint8_t imageHeaderLen_ = 0;
+
+    // Passt die uebertragene Firmware ueberhaupt auf diesen Chip? Jedes
+    // ESP-Image traegt in seinem Header eine Chip-Kennung (Byte 12/13,
+    // little endian: 0x0009 = ESP32-S3, 0x0005 = ESP32-C3). Seit es zwei
+    // Geraetevarianten auf verschiedenen Architekturen gibt, ist das die
+    // Stelle, an der ein an die falsche Waage geschicktes Binary auffallen
+    // muss - siehe Kommentar in der Implementierung.
+    bool imageMatchesThisChip() const;
 
     void handleControl(std::string& value);
     void handleData(std::string& value);

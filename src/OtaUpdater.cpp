@@ -1,5 +1,6 @@
 #include "OtaUpdater.h"
 #include <Arduino.h>
+#include <sdkconfig.h> // CONFIG_IDF_FIRMWARE_CHIP_ID
 
 namespace {
     // Keine neuen Daten trotz laufendem Update -> vermutlich Verbindung tot,
@@ -92,6 +93,7 @@ void OtaUpdater::beginUpdate(uint32_t totalSize, const uint8_t md5[16]) {
 
     totalSize_ = totalSize;
     bytesWritten_ = 0;
+    imageHeaderLen_ = 0; // sonst wuerde ein zweiter Versuch die Chip-Pruefung ueberspringen
     state_ = State::InProgress;
     error_ = ErrorCode::None;
     lastDataMs_ = millis();
@@ -99,9 +101,54 @@ void OtaUpdater::beginUpdate(uint32_t totalSize, const uint8_t md5[16]) {
     sendStatus(true);
 }
 
+/**
+ * Jedes ESP-Firmware-Image beginnt mit esp_image_header_t: Byte 0 ist das
+ * Magic 0xE9, Byte 12/13 tragen die Chip-Kennung (little endian, 0x0009 =
+ * ESP32-S3, 0x0005 = ESP32-C3). CONFIG_IDF_FIRMWARE_CHIP_ID ist genau der
+ * Wert, fuer den dieses Binary gebaut wurde.
+ *
+ * Warum das hier geprueft wird, obwohl der Bootloader dasselbe tut: seit es
+ * zwei Geraetevarianten auf VERSCHIEDENEN Architekturen gibt (Xtensa und
+ * RISC-V), haengt an der Auswahl der richtigen .bin nur die App - und die
+ * entscheidet anhand der Geraete-Info, die sie beim Verbinden gelesen hat.
+ * Geht dabei etwas schief (alte App-Version im Browser-Cache, unlesbare
+ * Characteristic, Fehler auf dem Weg), landet ein Image der falschen
+ * Architektur hier. Es dann erst beim Booten scheitern zu lassen, waere die
+ * schlechtere Antwort: das Geraet haette sich schon umgeschaltet, und der
+ * Nutzer saehe ein "Update erfolgreich", das keins war. Also lieber sofort
+ * ablehnen, solange die alte Firmware noch unangetastet laeuft.
+ */
+bool OtaUpdater::imageMatchesThisChip() const {
+    if (imageHeader_[0] != 0xE9) return false; // kein ESP-Image
+    uint16_t chipId = static_cast<uint16_t>(imageHeader_[12]) |
+                      (static_cast<uint16_t>(imageHeader_[13]) << 8);
+    return chipId == CONFIG_IDF_FIRMWARE_CHIP_ID;
+}
+
 void OtaUpdater::handleData(std::string& value) {
     if (state_ != State::InProgress) return; // kein Update.write() ohne vorheriges begin()
     if (value.empty()) return;
+
+    // Kopfdaten mitschneiden, bis 16 Byte beisammen sind, und dann einmalig
+    // pruefen. Ueber mehrere Chunks gesammelt, damit die Pruefung auch bei
+    // sehr kleinen Chunks greift - in der Praxis kommt der Kopf komplett im
+    // allerersten.
+    if (imageHeaderLen_ < sizeof(imageHeader_)) {
+        size_t take = sizeof(imageHeader_) - imageHeaderLen_;
+        if (take > value.size()) take = value.size();
+        memcpy(imageHeader_ + imageHeaderLen_, value.data(), take);
+        imageHeaderLen_ += take;
+
+        if (imageHeaderLen_ == sizeof(imageHeader_) && !imageMatchesThisChip()) {
+            uint16_t chipId = static_cast<uint16_t>(imageHeader_[12]) |
+                              (static_cast<uint16_t>(imageHeader_[13]) << 8);
+            Serial.printf("[OTA] Firmware passt nicht zu diesem Chip "
+                          "(Image 0x%04X, erwartet 0x%04X) - abgelehnt.\n",
+                          chipId, (unsigned)CONFIG_IDF_FIRMWARE_CHIP_ID);
+            abortUpdate(ErrorCode::ChipMismatch);
+            return;
+        }
+    }
 
     size_t written = Update.write(reinterpret_cast<uint8_t*>(&value[0]), value.size());
     if (written != value.size()) {
