@@ -27,4 +27,15 @@ public:
     // gesteckt, siehe readVoltage()) - wird 1:1 als 0xFF ueber BLE gesendet,
     // siehe BleWeightService.
     int8_t readPercent();
+
+private:
+    // Gleitender Mittelwert ueber aufeinanderfolgende readVoltage()-Aufrufe
+    // (zusaetzlich zum Oversampling INNERHALB eines Aufrufs, siehe .cpp) -
+    // daempft Rest-Rauschen, das sonst am Rand einer Kurven-Stufe in
+    // Battery::readPercent() sichtbar hin- und herspringt (z.B. 79%/81%
+    // abwechselnd trotz stabilem Akku). Wird zurueckgesetzt, sobald ein
+    // ungueltiger Messwert auftritt (siehe .cpp), damit ein spaeter wieder
+    // gueltiger Wert nicht erst langsam "eingeschwungen" werden muss.
+    float filteredVoltage_ = 0.0f;
+    bool hasFilteredVoltage_ = false;
 };
