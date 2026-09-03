@@ -76,6 +76,34 @@ void onCalibrationRequested() {
     lastActivityMs = millis();
 }
 
+// Werkbank-Ersatz fuer den Taster-Doppelklick/Langdruck: "cal" + Enter im
+// Serial Monitor loest dieselbe Kalibrierroutine aus - praktisch, solange
+// (noch) kein Taster angeschlossen ist. Liest zeichenweise ueber mehrere
+// loop()-Durchlaeufe in einen statischen Puffer, bis eine Zeile fertig ist;
+// laeuft nur ausserhalb von calibration.run() (das liest Serial ja selbst
+// blockierend), es gibt also keine Ueberschneidung beim Byte-Verbrauch.
+void checkSerialCalibrationTrigger() {
+    static String buf;
+    while (Serial.available()) {
+        char c = static_cast<char>(Serial.read());
+        if (c == '\n' || c == '\r') {
+            buf.trim();
+            if (buf.length() > 0) {
+                if (buf.equalsIgnoreCase("cal")) {
+                    Serial.println("[Serial] 'cal' empfangen - starte Kalibrierung.");
+                    calibrationRequested = true;
+                    lastActivityMs = millis();
+                } else {
+                    Serial.printf("[Serial] Unbekannter Befehl: '%s' (kalibrieren mit 'cal')\n", buf.c_str());
+                }
+            }
+            buf = "";
+        } else {
+            buf += c;
+        }
+    }
+}
+
 void onSleepLongPress() {
     Serial.println("[Button] Langer Druck: Deep Sleep angefordert.");
     sleepRequested = true;
@@ -230,6 +258,7 @@ void setup() {
 #else
     Serial.println("Taster: Tara (kurz) / Deep Sleep (2s halten) / Kalibrierung (Doppelklick)");
 #endif
+    Serial.println("Serial: 'cal' + Enter startet die Kalibrierung (Werkbank-Ersatz fuer den Taster).");
     Serial.printf("[Power] Auto-Sleep nach %lu Minuten Inaktivitaet.\n", AUTO_SLEEP_TIMEOUT_MS / 60000UL);
 
     lastActivityMs = millis();
@@ -238,6 +267,7 @@ void setup() {
 void loop() {
     buttons.update();
     devOta.update();
+    checkSerialCalibrationTrigger();
 
     if (sleepRequested) {
         sleepRequested = false;
