@@ -73,7 +73,10 @@ Board-Profile in `include/boards/`.
 | Peripherie-Power-Enable | 15 |
 | Batteriespannung (ADC) | 4 |
 
-![Pinout Maßarbeit Vision](docs/pinout/massarbeit-vision.svg)
+Angeschlossen wird dabei nur der HX711 (Waegezelle) - Taster, Display, Power-
+Enable und Batterie-ADC sind bereits fest auf dem Board verdrahtet:
+
+![HX711-Anschluss Maßarbeit Vision](docs/pinout/massarbeit-vision-pinout.png)
 
 Quelle: [Xinyuan-LilyGO/T-Display-S3](https://github.com/Xinyuan-LilyGO/T-Display-S3)
 README-Pinout-Tabelle. **Wichtig:** GPIO5/6 sind bei WeighMyBru2s Original-
@@ -96,7 +99,10 @@ Laderegler, Power-Schalter, Reset-Taster. PlatformIO-Boardprofil
 | Status-LED | 3 | Onboard (`LED_BUILTIN` der Arduino-Variante), nicht herausgefuehrt |
 | Batteriespannung (ADC) | 2 | ADC1_CH2, Onboard-Spannungsteiler (Faktor 2) |
 
-![Pinout Maßarbeit (Basis)](docs/pinout/massarbeit-basis.svg)
+Angeschlossen werden hier der HX711 und der externe Taster - die Status-LED
+und der Batterie-ADC haengen bereits fest am Board:
+
+![HX711- und Taster-Anschluss Maßarbeit](docs/pinout/massarbeit-basis-pinout.png)
 
 Quellen: [Xinyuan-LilyGO/LilyGo-T-OI-PLUS](https://github.com/Xinyuan-LilyGO/LilyGo-T-OI-PLUS)
 (Pinmap-Bild + `example/battery_voltage`) und die Arduino-Variante
