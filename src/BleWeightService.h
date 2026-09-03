@@ -52,6 +52,8 @@ private:
     static const uint8_t COMMAND_DISPLAY_AWAY = 0x13;
     static const uint8_t COMMAND_PLAYER_TURN = 0x14;
     static const uint8_t COMMAND_PLAYER_CLEAR = 0x15;
+    static const uint8_t COMMAND_CALIBRATION_GET_RAW = 0x20;
+    static const uint8_t COMMAND_CALIBRATION_SET_FACTOR = 0x21;
 
     Scale& scale_;
     DeviceUi& ui_;
@@ -62,6 +64,7 @@ private:
     NimBLECharacteristic* batteryChar_ = nullptr;
     NimBLECharacteristic* versionChar_ = nullptr;
     NimBLECharacteristic* deviceInfoChar_ = nullptr;
+    NimBLECharacteristic* calibrationChar_ = nullptr;
     OtaUpdater ota_;
 
     volatile bool connected_ = false;
@@ -78,6 +81,9 @@ private:
 
     void sendWeight(float grams);
     void sendBattery(int8_t percent);
+    // Antwort auf COMMAND_CALIBRATION_GET_RAW: schreibt+notified den HX711-
+    // Rohwert auf BLE_CALIBRATION_CHAR_UUID.
+    void sendCalibrationRaw(int32_t raw);
     // Schaltet die Verbindung fuer die Dauer einer Firmware-Uebertragung auf
     // Durchsatz statt auf Sparsamkeit (siehe Implementierung).
     void applyLinkSpeed(bool fast);
