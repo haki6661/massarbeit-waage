@@ -19,7 +19,21 @@ float Battery::readVoltage() {
 #if !MASSARBEIT_HAS_BATTERY
     return 0.0f; // Board ohne Akkumessung - siehe Board-Profil
 #else
-    uint32_t raw = analogRead(Pins::BATTERY_ADC);
+    // Oversampling statt eines einzelnen analogRead(): ein einzelnes 12-Bit-
+    // Sample des ESP32-ADC schwankt durch elektrisches Rauschen leicht
+    // (typischerweise einige mV) - direkt an einer Stufe der stueckweise-
+    // linearen Entladekurve (readPercent() unten) reichen davon schon
+    // 10-15mV fuer einen sichtbaren Prozentsprung in der App (z.B. 79/81
+    // abwechselnd bei stabilem Akku). Diese Funktion wird nur alle
+    // BLE_BATTERY_NOTIFY_INTERVAL_MS (5s) aufgerufen, 32 zusaetzliche
+    // Samples (<1ms) fallen dabei nicht ins Gewicht.
+    constexpr int SAMPLES = 32;
+    uint32_t rawSum = 0;
+    for (int i = 0; i < SAMPLES; i++) {
+        rawSum += analogRead(Pins::BATTERY_ADC);
+    }
+    uint32_t raw = rawSum / SAMPLES;
+
     // Spannungsteiler vor dem ADC (beide Boards: Faktor 2), siehe
     // MASSARBEIT_BATTERY_DIVIDER im Board-Profil.
     uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adcChars) * MASSARBEIT_BATTERY_DIVIDER;
@@ -27,6 +41,7 @@ float Battery::readVoltage() {
     if (millivolts > 4300) {
         // Kein Akku angeschlossen / USB gesteckt -> ADC sieht nur die
         // Ladespannung des Ladereglers, kein verlaesslicher Zellwert.
+        hasFilteredVoltage_ = false; // s.u.: naechster gueltiger Wert soll sofort gelten, nicht erst einschwingen
         return 0.0f;
     }
     if (millivolts < 2500) {
@@ -37,9 +52,26 @@ float Battery::readVoltage() {
         // lieber gar nichts melden (-> 0xFF, App blendet die Anzeige aus) als
         // eine erfundene Zahl. Ein wirklich so leerer Akku haette den ESP32
         // ohnehin laengst abgeschaltet.
+        hasFilteredVoltage_ = false;
         return 0.0f;
     }
-    return millivolts / 1000.0f;
+
+    float voltage = millivolts / 1000.0f;
+
+    // Zusaetzlich ueber aufeinanderfolgende Aufrufe glaetten (exponentiell
+    // gleitender Mittelwert, alpha=0.25): die Akkuspannung im Ruhebetrieb
+    // aendert sich nur ueber Minuten/Stunden, ein neuer Messwert alle 5s darf
+    // also ruhig traege einfliessen - das raeumt restliches Rauschen weg, das
+    // das obige Mitteln allein nicht schluckt, folgt einem echten Trend
+    // (Akku laedt/entlaedt sich tatsaechlich) aber trotzdem innerhalb von
+    // unter einer Minute.
+    if (!hasFilteredVoltage_) {
+        filteredVoltage_ = voltage;
+        hasFilteredVoltage_ = true;
+    } else {
+        filteredVoltage_ += 0.25f * (voltage - filteredVoltage_);
+    }
+    return filteredVoltage_;
 #endif
 }
 
