@@ -12,7 +12,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.8.2"
+#define FIRMWARE_VERSION "1.9.0"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -48,6 +48,13 @@
 // Fehlt die Characteristic (aeltere Firmware), nimmt die App "Vision mit
 // Display" an - alte Geraete funktionieren unveraendert weiter.
 #define BLE_DEVICE_INFO_CHAR_UUID "6E40000A-B5A3-F393-E0A9-E50E24DCCA9E" // read, UTF-8-JSON
+
+// Kalibrierung per App statt (ausschliesslich) per Serial Monitor + Taster
+// (siehe CalibrationRoutine.h, weiterhin als Fallback ohne Handy vorhanden).
+// Rohwert-Characteristic: read+notify, int32 LE, HX711-Rohwert (Mittel aus 10
+// Messungen) - von der App nach COMMAND_CALIBRATION_GET_RAW gelesen, siehe
+// COMMAND_CALIBRATION_SET_FACTOR weiter unten fuer den Rueckweg.
+#define BLE_CALIBRATION_CHAR_UUID "6E40000B-B5A3-F393-E0A9-E50E24DCCA9E" // read+notify, int32 LE, Rohwert
 
 // Firmware-Update per BLE (siehe OtaUpdater.h) - loest die geplante
 // WLAN-freie Ablösung des reinen Entwicklungs-OTA (siehe Abschnitt weiter
@@ -93,6 +100,15 @@
 //                       (auf dem Display ohnehin auf ca. 10 Zeichen
 //                       abgeschnitten).
 //   0x15               Zug beendet / kein aktiver Spieler - Badge weg.
+//   0x20               Kalibrierung: aktuellen HX711-Rohwert messen (Mittel aus
+//                       10 Messungen, dauert ~1s und blockiert currentWeight-
+//                       Updates so lange) und ueber BLE_CALIBRATION_CHAR_UUID
+//                       als int32 LE zurueckmelden.
+//   0x21 <float32 LE>   Kalibrierung: neuen Kalibrierfaktor setzen und im NVS
+//                       speichern (Scale::set_scale(), Faktor = Rohwert /
+//                       Referenzgewicht - siehe CalibrationRoutine.cpp fuer
+//                       dieselbe Formel). Unplausible Werte (<=0, NaN/Inf)
+//                       werden ignoriert, der bisherige Faktor bleibt aktiv.
 // 0x10-0x15 loesen KEINE eigene Gewichtslogik aus, sie steuern nur, was die
 // Geraeteanzeige gerade zeigt (TFT-Vollbild bzw. LED-Muster auf der Basis) -
 // die Waage selbst weiss nichts vom Spielzustand, die App entscheidet und
