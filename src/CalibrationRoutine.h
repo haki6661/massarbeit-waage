@@ -11,6 +11,11 @@
 // LedStatusUi::showMessage()). Waehrend run() laufen BLE/Anzeige/Taster-
 // Polling der Hauptschleife nicht weiter - das ist hier in Ordnung und
 // deutlich einfacher als eine nebenlaeufige State Machine.
+//
+// Seit COMMAND_CALIBRATION_GET_RAW/-SET_FACTOR (siehe BleWeightService.h,
+// Config.h) kann dieselbe Kalibrierung auch direkt aus der App per BLE
+// gefahren werden, ohne USB/Serial Monitor - diese Routine bleibt als
+// Fallback ohne Handy in der Naehe erhalten (z.B. Erstinbetriebnahme).
 
 #include "DeviceUi.h"
 #include "Scale.h"

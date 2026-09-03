@@ -86,6 +86,14 @@ void BleWeightService::begin() {
         NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
     ota_.begin(otaControlChar, otaDataChar, otaStatusChar);
 
+    // Kalibrierung per App statt (ausschliesslich) per Serial Monitor +
+    // Taster (siehe CalibrationRoutine.h, bleibt als Fallback ohne Handy
+    // erhalten) - Rohwert read+notify, Gegenstueck zu COMMAND_CALIBRATION_
+    // GET_RAW/-SET_FACTOR in onWrite().
+    calibrationChar_ = service->createCharacteristic(
+        BLE_CALIBRATION_CHAR_UUID,
+        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+
     service->start();
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
@@ -179,6 +187,19 @@ void BleWeightService::sendBattery(int8_t percent) {
     uint8_t value = (percent < 0) ? 0xFF : static_cast<uint8_t>(percent);
     batteryChar_->setValue(&value, 1);
     batteryChar_->notify();
+}
+
+void BleWeightService::sendCalibrationRaw(int32_t raw) {
+    if (!calibrationChar_) return;
+
+    union {
+        int32_t value;
+        uint8_t bytes[4];
+    } payload;
+    payload.value = raw;
+
+    calibrationChar_->setValue(payload.bytes, 4);
+    calibrationChar_->notify();
 }
 
 void BleWeightService::onConnect(NimBLEServer* /*server*/) {
@@ -288,6 +309,46 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
         case COMMAND_PLAYER_CLEAR:
             ui_.clearActivePlayer();
             break;
+
+        case COMMAND_CALIBRATION_GET_RAW: {
+            // Blockiert kurz (Mittel aus 10 HX711-Messungen, siehe
+            // Scale::getRawValue()) - unkritisch, das ist ein bewusst
+            // ausgelöster, seltener Wartungsschritt, kein Normalbetrieb.
+            Serial.println("[BLE] Kalibrierung: Rohwert angefordert.");
+            long raw = scale_.getRawValue();
+            sendCalibrationRaw(static_cast<int32_t>(raw));
+            break;
+        }
+
+        case COMMAND_CALIBRATION_SET_FACTOR: {
+            if (value.size() < 5) {
+                Serial.println("[BLE] CALIBRATION_SET_FACTOR-Kommando zu kurz, ignoriert.");
+                break;
+            }
+            union {
+                float value;
+                uint8_t bytes[4];
+            } payload;
+            payload.bytes[0] = static_cast<uint8_t>(value[1]);
+            payload.bytes[1] = static_cast<uint8_t>(value[2]);
+            payload.bytes[2] = static_cast<uint8_t>(value[3]);
+            payload.bytes[3] = static_cast<uint8_t>(value[4]);
+            float factor = payload.value;
+
+            // Gleiche Plausibilitaetspruefung wie CalibrationRoutine::run():
+            // ein Faktor <=0 oder nicht endlich kann nur aus einem
+            // fehlerhaften App-seitigen Wert stammen, nie aus einer echten
+            // Kalibrierung - lieber ignorieren, als die Waage mit einem
+            // kaputten Faktor stehenzulassen.
+            if (isnan(factor) || isinf(factor) || factor <= 0.0f) {
+                Serial.printf("[BLE] CALIBRATION_SET_FACTOR: unplausibler Faktor %.6f, ignoriert.\n", factor);
+                break;
+            }
+
+            scale_.set_scale(factor); // speichert automatisch ins NVS
+            Serial.printf("[BLE] Kalibrierung: neuer Faktor %.6f gesetzt und gespeichert.\n", factor);
+            break;
+        }
 
         default:
             Serial.printf("[BLE] Unbekanntes Kommando: 0x%02X\n", command);
