@@ -295,3 +295,56 @@ Gehäuse für die Basis, für die es bisher überhaupt keins gibt.
   Dateien, die auseinanderdriften?
 
 **Status:** Nicht begonnen.
+
+## 9. WS2812B-RGB-LED-Ring im Deckel für visuelle Cues
+
+**Idee:** Einen Ring aus adressierbaren WS2812B-LEDs in den Deckel einbauen
+und darüber dieselben Zustände zeigen, die heute schon über `RemoteCue`/
+`DeviceUi::setActivePlayer()` laufen (Bereit, Away, Ergebnis-Güte,
+Spielerfarbe) - nur eben als Lichteffekt rundum sichtbar statt auf einem
+kleinen Display oder einer einzelnen Status-LED.
+
+**Warum:** Sowohl das TFT der Vision als auch die einfarbige Status-LED der
+Basis sind nur aus einem engen Blickwinkel gut lesbar - auf einer Party
+mit mehreren Leuten um den Tisch verliert das schnell. Ein Ring ist von
+allen Seiten sichtbar und deutlich festlicher. Passt auch protokollseitig
+gut: der Spielerfarbe-Badge (`COMMAND_PLAYER_TURN`, `0x14 <gameId><r><g><b>…`,
+siehe `include/Config.h`) transportiert schon eine RGB-Farbe - ein Ring
+könnte die 1:1 übernehmen, ohne dass sich am BLE-Protokoll etwas ändern
+muss.
+
+**Was dafür fehlt:**
+
+- Eine WS2812B-Library (FastLED oder Adafruit_NeoPixel) als neue
+  Abhängigkeit.
+- Ein freier GPIO für die Datenleitung auf beiden Boards - auf der Basis
+  ist GPIO4 der naheliegende Kandidat (im Board-Profil `t_oi_plus.h` schon
+  als "für spätere Analog-Erweiterungen frei" vermerkt), auf der Vision ist
+  noch nicht durchgeprüft, welcher der vom Display/HX711/Tastern
+  unbenutzten Pins frei ist (siehe `t_display_s3.h`).
+- Ein drittes `DeviceUi`-Rendering-Backend (neben `TftDisplay` und
+  `LedStatusUi`) bzw. eine Erweiterung, die parallel zur bestehenden
+  Anzeige mitläuft - noch nicht entschieden, welches von beidem.
+
+**Offene Fragen, noch nicht entschieden:**
+
+- Beide Varianten, oder erstmal nur eine? Bei der Basis würde der Ring die
+  einzige echte Farbanzeige (ersetzt/ergänzt die einfarbige Status-LED),
+  bei der Vision käme er zusätzlich zum TFT.
+- Stromversorgung: WS2812B ziehen bis zu ~60mA je LED bei Vollweiß - bei
+  einem Ring mit mehreren LEDs gegen den kleinen Akku (16340 bzw. den
+  Vision-Akku) nicht vernachlässigbar. Braucht eine feste
+  Helligkeits-/Farbobergrenze im Code statt unein­geschränktem
+  `setBrightness()`, sonst leert sich der Akku im Party-Betrieb spürbar
+  schneller.
+- Pegelproblem: ESP32-GPIOs liefern 3.3V, WS2812B-Datenleitung ist für
+  5V-Logik spezifiziert. Kurze Leitungen laufen oft trotzdem stabil, das
+  muss aber am Aufbau gegengeprüft werden (ggf. Level-Shifter oder
+  Vorwiderstand + Puffer-Kondensator), bevor der Ring fest verbaut wird.
+- Ring-Durchmesser/LED-Anzahl hängen am Deckel-Formfaktor - gehört
+  eigentlich mit Punkt 8 (neue Gehäuse) zusammen gedacht, nicht isoliert.
+- Bildet der Ring nur die bestehenden `RemoteCue`-Zustände 1:1 ab, oder
+  entstehen eigene Lichtmuster (z.B. ein Lauflicht während des Wiegens),
+  die es bei TFT/Status-LED so nicht gibt?
+
+**Status:** Nicht begonnen.
