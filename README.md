@@ -363,9 +363,17 @@ kein Hänger.
 
 ### Release bauen
 
-1. `FIRMWARE_VERSION` in `include/Config.h` hochzählen (bewusst von Hand -
-   das Skript zählt nicht selbst hoch).
-2. Release bauen:
+**Automatisch (Standardweg):** `FIRMWARE_VERSION` in `include/Config.h`
+hochzählen (bewusst von Hand - das zählt nichts automatisch hoch), committen
+und auf `main` pushen. Der Workflow `.github/workflows/release-firmware.yml`
+baut daraufhin beide Varianten, aktualisiert `firmware/manifest.json` +
+`firmware/*.bin` und committet/pusht das Ergebnis selbst zurück auf `main` -
+die App erkennt das neue Manifest beim nächsten Öffnen der Einstellungen.
+Lässt sich auch ohne Versionsänderung manuell anstoßen (GitHub → Actions →
+"Firmware-Release bauen" → "Run workflow").
+
+**Von Hand** (z.B. ohne Internetzugriff auf GitHub Actions, oder um vor dem
+Push lokal zu prüfen):
 
 ```bash
 python scripts/release.py
@@ -374,10 +382,8 @@ python scripts/release.py
 Das baut beide Varianten, kopiert die Binaries nach `firmware/`, rechnet
 Größe + MD5 aus und schreibt beides in `firmware/manifest.json`. Nur eine
 Variante geht auch: `python scripts/release.py t-oi-plus`; der Eintrag der
-anderen bleibt dabei erhalten.
-
-3. Committen + auf `main` pushen - die App erkennt das neue Manifest beim
-   nächsten Öffnen der Einstellungen.
+anderen bleibt dabei erhalten. Anschließend wie gewohnt committen + auf
+`main` pushen.
 
 Der frühere 5-Schritte-Handbetrieb (bauen, `md5sum`, kopieren, Manifest von
 Hand pflegen) war schon mit einer Variante fehleranfällig und wird mit zweien
