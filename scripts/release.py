@@ -109,10 +109,17 @@ def publish(variant: str, version: str, do_build: bool) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    # Bewusst OHNE choices=list(VARIANTS) hier: nargs="*" zusammen mit choices
+    # ist ein bekannter argparse-Kuriosum - ohne uebergebenes Argument
+    # validiert argparse dann die leere Liste selbst gegen choices statt
+    # (mangels Elementen) gar nichts zu pruefen, und bricht mit "invalid
+    # choice: []" ab. Betraf genau den Normalfall "ohne Argumente = alle
+    # Varianten" und liess das Skript ueberall fehlschlagen (lokal wie im
+    # release-firmware.yml-Workflow). Validierung deshalb von Hand weiter
+    # unten, nach dem Parsen.
     parser.add_argument(
         "variants",
         nargs="*",
-        choices=list(VARIANTS),
         help="Welche Varianten veroeffentlicht werden (Vorgabe: alle).",
     )
     parser.add_argument(
@@ -121,6 +128,10 @@ def main() -> None:
         help="Nicht neu bauen, nur Groesse/MD5 der vorhandenen firmware/*.bin ins Manifest schreiben.",
     )
     args = parser.parse_args()
+
+    unknown = [v for v in args.variants if v not in VARIANTS]
+    if unknown:
+        sys.exit(f"Unbekannte Variante(n): {', '.join(unknown)} (bekannt: {', '.join(VARIANTS)})")
 
     selected = args.variants or list(VARIANTS)
     version = read_firmware_version()
