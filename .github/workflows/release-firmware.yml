@@ -1,0 +1,73 @@
+name: Firmware-Release bauen
+
+# Baut beide Firmware-Varianten (siehe scripts/release.py) und aktualisiert
+# firmware/manifest.json + firmware/*.bin auf main - das ist die Datei, die
+# die App (SettingsScreen -> lib/firmwareUpdate.ts) beim "Nach Updates
+# suchen" liest. Ohne diesen Workflow müsste das jemand lokal mit
+# installiertem PlatformIO von Hand machen (siehe README, Abschnitt "Release
+# bauen").
+#
+# Läuft automatisch, sobald sich FIRMWARE_VERSION in include/Config.h ändert
+# (der bewusste, von Hand gemachte Schritt vor jedem Release) - der
+# Pfadfilter auf genau diese Datei verhindert nebenbei eine Endlosschleife:
+# der Commit, den dieser Workflow selbst erzeugt, rührt nur firmware/ an,
+# nicht Config.h, triggert sich also nicht erneut selbst.
+#
+# Zusätzlich per Hand auslösbar (workflow_dispatch), z.B. um ein Release ohne
+# Versionsänderung neu zu bauen.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "include/Config.h"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Vollständige Historie statt Shallow-Clone - `git diff --quiet`
+          # weiter unten braucht einen sauberen Vergleichsstand, und ein
+          # Shallow-Clone kann bei "git push" gegen einen inzwischen
+          # weitergelaufenen main sonst unnötig Komplikationen machen.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # PlatformIO cacht Plattformen/Toolchains/Bibliotheken hier - ohne
+      # Cache lädt jeder Lauf den kompletten espressif32-Toolchain (mehrere
+      # hundert MB) neu herunter, das dauert unnötig lange.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            pio-${{ runner.os }}-
+
+      - name: PlatformIO installieren
+        run: pip install --upgrade platformio
+
+      - name: Beide Varianten bauen + Manifest schreiben
+        run: python scripts/release.py
+
+      - name: Änderungen committen und pushen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- firmware/; then
+            echo "Keine Änderungen an firmware/ - nichts zu committen (Version/Binaries bereits aktuell)."
+            exit 0
+          fi
+          version=$(grep -oP '(?<=FIRMWARE_VERSION ")[^"]+' include/Config.h)
+          git add firmware/
+          git commit -m "Firmware-Release ${version} (automatisch)"
+          git push origin HEAD:main
