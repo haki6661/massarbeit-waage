@@ -166,6 +166,9 @@ src/
                             Spieler-Badge, spielspezifische Away-Animationen,
                             Sprite-Bootanimation aus SPIFFS)
   LedStatusUi.h/.cpp      <- nur Basis: dieselben Zustaende als LED-Muster
+  LedRing.h/.cpp          <- WS2812B-Lichtring im Deckel: beide Varianten,
+                            vorbereitet und standardmaessig AUS
+                            (siehe "LED-Ring nachruesten")
   Battery.h/.cpp          <- Akkuspannung (kalibrierter ADC, aus LilyGOs Beispiel) + Prozent-Schaetzung
   CalibrationRoutine.h/.cpp <- interaktive Kalibrierung ueber Serial+Taster
   OtaUpdater.h/.cpp        <- Firmware-Update per BLE (Chunks -> Update.h)
@@ -232,6 +235,69 @@ Serial-Log, das auf der Basis den Bildschirm ersetzt.
 | Volltreffer (`0x12`) | 2s Dauerlicht |
 | nah dran (`0x12`) | zwei lange Blitze |
 | daneben (`0x12`) | ein langer, gedimmter Blitz |
+
+### LED-Ring nachrüsten (WS2812B, 5V RGB - vorbereitet, noch nicht bestückt)
+
+Die Firmware bringt die komplette Lichtlogik für einen adressierbaren
+WS2812B-Ring im Deckel schon mit (`src/LedRing.h/.cpp`), **aktiviert ist sie
+in keiner der beiden Varianten**. Ohne Freigabe im Board-Profil wirft der
+Compiler den gesamten Ring-Code als toten Code weg - das ausgeschaltete
+Binary wächst dadurch praktisch nicht, die Logik wird aber bei jedem Build
+mitkompiliert und kann nicht unbemerkt verrotten.
+
+Der Ring **ersetzt keine der bestehenden Anzeigen**, er läuft parallel mit:
+auf der Vision zusätzlich zum TFT, auf der Basis zusätzlich zur einfarbigen
+Status-LED. Am BLE-Protokoll ändert sich kein Byte - `TftDisplay` und
+`LedStatusUi` reichen dieselben Cue-/Spielerwechsel einfach an den Ring
+weiter, die App merkt nichts davon.
+
+**Scharfschalten (drei Handgriffe):**
+
+1. Ring anlöten, Datenleitung an `Pins::LED_RING_DATA` - Vision GPIO13,
+   Basis GPIO4 (Begründung der Pinwahl steht im jeweiligen Board-Profil).
+2. Im Board-Profil `MASSARBEIT_HAS_LED_RING` auf `1` setzen und
+   `MASSARBEIT_LED_RING_COUNT` auf die tatsächliche LED-Zahl (Vorgabe: 16).
+3. In `platformio.ini` die auskommentierte Zeile
+   `adafruit/Adafruit NeoPixel@^1.12.0` einkommentieren.
+
+**Vor dem Festlöten prüfen:** ESP32-GPIOs geben 3,3V aus, WS2812B sind für
+5V-Logik spezifiziert (kurze Leitungen laufen meist trotzdem, sicher ist ein
+Level-Shifter); 300-500Ω in die Datenleitung, ~1000µF über die 5V-Versorgung
+des Rings; der Ring hängt an 5V, **nicht** an der Akkuzelle. Die harte
+Helligkeitsobergrenze `LED_RING_MAX_BRIGHTNESS` (`include/Config.h`, Vorgabe
+40/255) sitzt bewusst in `LedRing::show()`, also an der einzigen Stelle, die
+wirklich Strom schaltet - bei Vollweiß zieht jede LED sonst bis zu ~60mA.
+
+**Was der Ring zeigt** (Reihenfolge = Priorität, dieselbe Rangfolge wie die
+Status-LED der Basis):
+
+| Zustand | Lichtbild |
+|---|---|
+| Startampel Formel 1 | fünf rote Lampen gehen nacheinander an, bleiben stehen, gehen gemeinsam aus ("lights out") - danach kurzer grüner Umlauf |
+| Fehlstart / Abbruch | rotes Warnblinken |
+| HX711 antwortet nicht | drei rote Blitze rundum |
+| "Bereit, jetzt trinken" (`0x11`) | ruhiger grüner Puls, nie ganz dunkel |
+| Glas weg / Abschlag (`0x13`) | spielabhängig: Golf rollender Ball, Dart beschleunigender Pfeil, Blackjack Karte für Karte, Wackelturm wachsender und kippender Stapel, Boxen Aufprall-Blitz, sonst ruhiger Komet |
+| Volltreffer (`0x12`) | grüner Grund mit schnellem weißem Umlauf |
+| nah dran (`0x12`) | zwei lange gelbe Blitze |
+| daneben (`0x12`) | ein langsam abfallendes Rot |
+| Gewicht auf der Waage | Balken in Spieler-/Spielfarbe, wächst mit dem Gewicht (Vollausschlag bei `LED_RING_WEIGH_FULL_SCALE_G`, Vorgabe 400g) |
+| Spieler am Zug | langsames Atmen in der Spielerfarbe (`0x14`) |
+| wartet auf die App | einzelner blauer Punkt kreist |
+| verbunden, Leerlauf | sehr schwaches Atmen im Akzentton |
+
+Der Wiege-Balken ist das einzige Muster, das es weder auf dem TFT noch auf
+der Status-LED gibt: beim Einschenken schaut man aufs Glas, nicht aufs
+Display - ein wachsender Lichtbogen im Deckel liegt genau im Blickfeld.
+
+Die Startampel ist bewusst schon vollständig da, obwohl das Spiel "Formel 1"
+die Waage bisher gar nicht anspricht: `LedRing::startRaceLights()` /
+`raceLightsGreen()` / `abortRaceLights()` funktionieren, es fehlt nur die
+BLE-Hälfte, die sie aus der App auslöst (siehe `ROADMAP.md`, "Formel 1 auf
+dem Gerät nachziehen"). Beide Varianten der offenen Frage "wer bestimmt
+Grün?" sind ohne weitere Änderung möglich: Haltezeit an `startRaceLights()`
+mitgeben (Waage lost aus) oder `startRaceLights(0)` und später
+`raceLightsGreen()` (App lost aus, wie heute in `formel1State.ts`).
 
 ## Kalibrieren (Schritt 4 - mit der 3kg-Zelle neu ermitteln)
 
