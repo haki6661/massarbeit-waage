@@ -19,9 +19,17 @@
 
 #include "DeviceUiTypes.h"
 
+class LedRing;
+
 class LedStatusUi {
 public:
     void begin();
+
+    // Optionaler WS2812B-Lichtring im Deckel (siehe LedRing.h) - laeuft
+    // parallel zu dieser Anzeige und bekommt von hier dieselben Cue-/
+    // Spielerwechsel weitergereicht. Ohne Aufruf (oder mit nullptr) aendert
+    // sich nichts, die Status-LED funktioniert unabhaengig davon.
+    void attachLedRing(LedRing* ring) { ledRing_ = ring; }
 
     // In loop() aufrufen. Bestimmt aus dem aktuellen Zustand das Signal und
     // setzt die LED-Helligkeit fuer diesen Moment. Prioritaet (hoechste
@@ -88,6 +96,8 @@ private:
     Signal currentSignal(bool hx711Connected, bool bleConnected);
     void applySignal(const Signal& signal, uint32_t now);
     void setLevel(uint8_t level);
+
+    LedRing* ledRing_ = nullptr;
 
     bool ready_ = false;
     // Bewusst int16_t mit -1 als "noch nie gesetzt": 0xFF waere als uint8_t

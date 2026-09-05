@@ -151,6 +151,45 @@
 #define DEV_OTA_PASSWORD  "massarbeit"     // beim Upload: --auth=massarbeit (bzw. angepasst)
 
 // ============================================================================
+// WS2812B-RGB-LED-Ring (vorbereitet, standardmaessig AUS)
+// ----------------------------------------------------------------------------
+// Zeit- und Helligkeitswerte des Lichtrings im Deckel (siehe src/LedRing.h).
+// Sie gelten erst, wenn `MASSARBEIT_HAS_LED_RING` im Board-Profil auf 1
+// steht - vorher wird der komplette Ring-Code vom Compiler als toter Code
+// verworfen. Hier stehen sie trotzdem schon, weil das die Werte sind, an
+// denen man beim ersten Aufbau tatsaechlich dreht.
+// ============================================================================
+
+// Harte Helligkeitsobergrenze (0-255), angewandt in LedRing::show(). WS2812B
+// ziehen bei Vollweiss bis zu ~60mA je LED - 16 LEDs waeren fast 1A und
+// wuerden die 16340-Zelle der Basis in kurzer Zeit leeren. 40/255 ist im
+// Partylicht immer noch deutlich sichtbar, kostet aber nur einen Bruchteil.
+// Vor dem Hochdrehen die Stromversorgung pruefen, nicht nur das Aussehen.
+#define LED_RING_MAX_BRIGHTNESS 40
+
+// Bildrate des Rings. 20ms = 50 Bilder/s; jedes Bild sperrt waehrend der
+// WS2812B-Uebertragung kurz die Interrupts (~30µs je LED), deshalb bewusst
+// getaktet und nicht bei jedem loop()-Durchlauf.
+#define LED_RING_FRAME_INTERVAL_MS 20
+
+// Wiege-Balken: ab wann er ueberhaupt erscheint und wo Vollausschlag ist
+// (ein volles grosses Glas). Darunter bleibt der Ring fuer Spieler-/
+// Leerlauf-Anzeige frei, statt dauerhaft eine leere Skala zu zeigen.
+#define LED_RING_WEIGH_MIN_G 5.0f
+#define LED_RING_WEIGH_FULL_SCALE_G 400.0f
+
+// Startampel "Formel 1" (siehe LedRing::startRaceLights()). Im echten
+// Rennen kommt etwa jede Sekunde eine Lampe dazu; danach entscheidet
+// entweder eine mitgegebene Haltezeit oder die App, wann es losgeht.
+#define LED_RING_RACE_LAMP_INTERVAL_MS 900
+// "Lights out": erst schlagartig dunkel (das IST das Startsignal), dann ein
+// kurzer gruener Umlauf als Bestaetigung fuer den, der nicht hingesehen hat.
+#define LED_RING_RACE_GO_DARK_MS 150
+#define LED_RING_RACE_GO_SWEEP_MS 600
+// Fehlstart/Abbruch: Dauer des roten Warnblinkens.
+#define LED_RING_RACE_ABORT_MS 1200
+
+// ============================================================================
 // Power Management (Deep Sleep)
 // ----------------------------------------------------------------------------
 // Taste 1 LANG druecken (siehe Buttons.h) -> sofort in Deep Sleep. Zusaetzlich

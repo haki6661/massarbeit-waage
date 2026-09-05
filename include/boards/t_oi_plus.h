@@ -39,6 +39,15 @@
 // NeoPixel-Beispiele in LilyGOs Repo gehoeren zum aufsteckbaren RGB-Shield
 // (7 Pixel, Datenpin ueber DIP-Schalter waehlbar), nicht zum Board selbst.
 #define MASSARBEIT_STATUS_LED_RGB  0
+// WS2812B-Lichtring im Deckel: vorbereitet, aber AUS - die Firmware bringt
+// die komplette Lichtlogik schon mit (src/LedRing.h), es fehlt nur die
+// Hardware. Auf 1 setzen, sobald ein Ring an Pins::LED_RING_DATA haengt UND
+// die NeoPixel-Abhaengigkeit in platformio.ini aktiviert ist; dann auch
+// MASSARBEIT_LED_RING_COUNT auf die tatsaechliche LED-Zahl korrigieren.
+// Fuer die Basis waere der Ring die erste echte Farbanzeige ueberhaupt - die
+// einfarbige Onboard-LED laeuft unveraendert weiter, beide ergaenzen sich.
+#define MASSARBEIT_HAS_LED_RING    0
+#define MASSARBEIT_LED_RING_COUNT  16
 #define MASSARBEIT_HAS_BATTERY     1
 #define MASSARBEIT_BUTTON_COUNT    1
 #define MASSARBEIT_HAS_POWER_ON    0
@@ -99,6 +108,22 @@ constexpr uint8_t WAKEUP_BUTTON = BUTTON_1;
 // Onboard-LED, entspricht LED_BUILTIN der Arduino-Variante. GPIO3 ist auf
 // keine Stiftleiste herausgefuehrt, kann also gar nichts anderes sein.
 constexpr uint8_t STATUS_LED = 3;
+
+// --- WS2812B-Lichtring (vorbereitet, siehe MASSARBEIT_HAS_LED_RING) -------
+// GPIO4: der einzige Pin, den die Basis noch komplett frei hat (oben bei
+// BUTTON_1 als "bleibt fuer spaetere Erweiterungen frei" vermerkt - hier ist
+// die Erweiterung). Kein Strapping-Pin, kein Flash-/UART-Pin, auf die
+// Stiftleiste herausgefuehrt. Dass GPIO4 zugleich ADC1 ist, spielt hier
+// keine Rolle: als Datenausgang wird der ADC ohnehin nicht genutzt.
+//
+// Vor dem Festloeten beachten (siehe ROADMAP.md, Punkt zum LED-Ring):
+//   - Pegel: der C3 gibt 3.3V aus, WS2812B sind fuer 5V-Logik spezifiziert.
+//     Kurze Leitungen laufen meist trotzdem, sicher ist ein Level-Shifter.
+//   - 300-500Ohm in die Datenleitung und ein Puffer-Kondensator (~1000µF)
+//     ueber die 5V-Versorgung des Rings, sonst kann die erste LED sterben.
+//   - Strom: der Ring haengt an 5V, NICHT an der 16340-Zelle - das Board
+//     kann ihn nicht mitversorgen (siehe LED_RING_MAX_BRIGHTNESS).
+constexpr uint8_t LED_RING_DATA = 4;
 
 // --- Batterie -------------------------------------------------------------
 // GPIO2 = ADC1_CH2, haengt ueber den Onboard-Spannungsteiler an der

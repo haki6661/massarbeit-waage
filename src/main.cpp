@@ -9,6 +9,7 @@
 #include "BleWeightService.h"
 #include "Buttons.h"
 #include "DeviceUi.h"
+#include "LedRing.h"
 #include "Battery.h"
 #include "CalibrationRoutine.h"
 #include "DevOta.h"
@@ -16,6 +17,11 @@
 Scale scale(Pins::HX711_DOUT, Pins::HX711_SCK, DEFAULT_CALIBRATION_FACTOR);
 // TFT (Vision) oder Status-LED (Basis) - siehe DeviceUi.h.
 DeviceUi ui;
+// WS2812B-Ring im Deckel: laeuft PARALLEL zur Hauptanzeige mit, kein Ersatz
+// fuer sie. Standardmaessig im Board-Profil ausgeschaltet - dann sind alle
+// Aufrufe hier leer und der Ring-Code faellt beim Kompilieren weg
+// (siehe src/LedRing.h).
+LedRing ledRing;
 Battery battery;
 BleWeightService bleService(scale, ui, battery);
 Buttons buttons;
@@ -134,6 +140,9 @@ void enterDeepSleep() {
     delay(1200);
 
     ui.prepareForSleep();
+    // Muss ausdruecklich geloescht werden: WS2812B halten ihr letztes Bild
+    // auch dann, wenn der Chip schon schlaeft.
+    ledRing.prepareForSleep();
 
 #if MASSARBEIT_HAS_POWER_ON
     digitalWrite(Pins::POWER_ON, LOW); // Peripherie (Display etc.) stromlos schalten
@@ -237,6 +246,11 @@ void setup() {
     devOtaActive = bootDevOtaRequested;
 
     ui.begin();
+    ledRing.begin();
+    // Der Ring sieht dieselben Cue-/Spielerwechsel wie die Hauptanzeige,
+    // ohne dass BleWeightService oder das BLE-Protokoll etwas davon wissen
+    // muessen (siehe attachLedRing() in TftDisplay.h/LedStatusUi.h).
+    ui.attachLedRing(&ledRing);
 
     // Kein Text-Zwischenscreen mehr davor ("Starte...") - die Startsequenz
     // (Sprite-Animation auf der Vision, atmende Status-LED auf der
@@ -300,6 +314,11 @@ void loop() {
     }
 
     ui.update(scale.isHX711Connected(), bleService.isConnected());
+    // Gleiche Zustaende wie die Hauptanzeige, zusaetzlich das Live-Gewicht
+    // fuer den Wiege-Balken - den gibt es weder auf dem TFT noch auf der
+    // Status-LED (siehe LedRing::renderWeighing()).
+    ledRing.setWeight(weight);
+    ledRing.update(scale.isHX711Connected(), bleService.isConnected());
 
     delay(5);
 }

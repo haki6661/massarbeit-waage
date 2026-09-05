@@ -1,5 +1,6 @@
 #include "TftDisplay.h"
 #include "BoardConfig.h"
+#include "LedRing.h"
 #include "FreeSansBold10pt7b.h"
 #include <SPIFFS.h>
 #include <math.h>
@@ -414,6 +415,8 @@ void TftDisplay::setRemoteCue(RemoteCue cue, GameKind game) {
     remoteCue_ = cue;
     remoteCueGame_ = game;
     remoteCueSetMs_ = millis();
+    // Lichtring (falls bestueckt) zeigt denselben Moment rundum, siehe LedRing.h.
+    if (ledRing_) ledRing_->setRemoteCue(cue, game);
     forceRedraw_ = true; // sofort anzeigen, nicht auf den 150ms-Drossel-Timer warten
 
     // Neuer Cue = neuer Render-Kontext: alle "letzte Position"-Merker fuer
@@ -571,11 +574,13 @@ void TftDisplay::setActivePlayer(GameKind game, uint16_t color565, const String&
     // Auf ca. 10 Zeichen kuerzen - mehr passt bei Textsize 2 neben dem
     // Farb-Badge nicht mehr lesbar hin (siehe renderPlayerBadge()).
     activePlayerName_ = name.length() > 10 ? name.substring(0, 10) : name;
+    if (ledRing_) ledRing_->setActivePlayer(game, color565);
     forceRedraw_ = true;
 }
 
 void TftDisplay::clearActivePlayer() {
     hasActivePlayer_ = false;
+    if (ledRing_) ledRing_->clearActivePlayer();
     forceRedraw_ = true;
 }
 

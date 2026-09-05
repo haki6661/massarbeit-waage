@@ -20,6 +20,12 @@
 #define MASSARBEIT_HAS_TFT         1
 #define MASSARBEIT_HAS_STATUS_LED  0
 #define MASSARBEIT_STATUS_LED_RGB  0
+// WS2812B-Lichtring im Deckel: vorbereitet, aber AUS (identisch zur Basis,
+// siehe t_oi_plus.h und src/LedRing.h). Auf der Vision kaeme er ZUSAETZLICH
+// zum TFT - das Display bleibt unveraendert, der Ring traegt dieselben
+// Zustaende nur rundum sichtbar nach aussen.
+#define MASSARBEIT_HAS_LED_RING    0
+#define MASSARBEIT_LED_RING_COUNT  16
 #define MASSARBEIT_HAS_BATTERY     1
 #define MASSARBEIT_BUTTON_COUNT    2
 #define MASSARBEIT_HAS_POWER_ON    1
@@ -76,5 +82,22 @@ constexpr uint8_t BATTERY_ADC = 4;
 // etwas geaendert hat.
 constexpr uint8_t HX711_DOUT = 1;
 constexpr uint8_t HX711_SCK  = 2;
+
+// --- WS2812B-Lichtring (vorbereitet, siehe MASSARBEIT_HAS_LED_RING) -------
+// GPIO13: laut offizieller Pin-Tabelle auf die Stiftleiste herausgefuehrt und
+// von Display-Bus, Backlight, POWER_ON, Tastern, Batterie-ADC und HX711
+// unbenutzt. Kein Strapping-Pin (das sind am S3 GPIO0/3/45/46).
+//
+// Bewusst NICHT genommen, obwohl ebenfalls "frei" aussehend:
+//   GPIO16/17/18/21 - auf der Touch-Version des T-Display S3 liegen dort
+//                     der kapazitive Touch-Controller (INT/SCL/SDA/RST).
+//                     Wer spaeter auf ein Touch-Board wechselt, haette
+//                     sonst einen stillen Konflikt.
+//   GPIO43/44       - UART0 (TX/RD), also der Serial-Monitor.
+//   GPIO3           - Strapping-Pin (JTAG-Quellwahl).
+// Ob GPIO13 auf dem konkreten Board-Revisionsstand wirklich frei liegt, vor
+// dem Festloeten einmal mit dem Multimeter gegenpruefen - dieselbe Vorsicht
+// wie bei den HX711-Pins oben. Zum Pegel-/Strom-Thema siehe t_oi_plus.h.
+constexpr uint8_t LED_RING_DATA = 13;
 
 } // namespace Pins

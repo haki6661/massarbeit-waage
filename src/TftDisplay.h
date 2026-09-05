@@ -16,9 +16,17 @@
 // auf LED-Muster ab) - deshalb ausgelagert.
 #include "DeviceUiTypes.h"
 
+class LedRing;
+
 class TftDisplay {
 public:
     void begin();
+
+    // Optionaler WS2812B-Lichtring im Deckel (siehe LedRing.h) - laeuft
+    // parallel zum TFT und bekommt von hier dieselben Cue-/Spielerwechsel
+    // weitergereicht. Ohne Aufruf (oder mit nullptr) aendert sich am
+    // Display-Verhalten nichts.
+    void attachLedRing(LedRing* ring) { ledRing_ = ring; }
 
     // In loop() aufrufen. Zeichnet intern gedrosselt (~alle 150ms) neu, um
     // nicht bei jedem Loop-Durchlauf den ganzen Bildschirm neu zu fuellen.
@@ -97,6 +105,8 @@ public:
     uint16_t color565FromRgb(uint8_t r, uint8_t g, uint8_t b) const { return gfx_->color565(r, g, b); }
 
 private:
+    LedRing* ledRing_ = nullptr;
+
     Arduino_DataBus* bus_ = nullptr;
     Arduino_GFX* gfx_ = nullptr;
 

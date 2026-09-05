@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include "BoardConfig.h"
+#include "LedRing.h"
 
 namespace {
 
@@ -230,6 +231,7 @@ void LedStatusUi::setRemoteCue(RemoteCue cue, GameKind game) {
     remoteCue_ = cue;
     remoteCueGame_ = game;
     remoteCueSetMs_ = millis();
+    if (ledRing_) ledRing_->setRemoteCue(cue, game);
 }
 
 void LedStatusUi::setActivePlayer(GameKind game, uint16_t color565, const String& name) {
@@ -237,6 +239,7 @@ void LedStatusUi::setActivePlayer(GameKind game, uint16_t color565, const String
     activeGame_ = game;
     activePlayerColor565_ = color565;
     activePlayerName_ = name;
+    if (ledRing_) ledRing_->setActivePlayer(game, color565);
     Serial.printf("[UI] Zug: %s (%s)\n", name.c_str(), gameName(game));
 }
 
@@ -244,4 +247,5 @@ void LedStatusUi::clearActivePlayer() {
     hasActivePlayer_ = false;
     activeGame_ = GameKind::None;
     activePlayerName_ = "";
+    if (ledRing_) ledRing_->clearActivePlayer();
 }
