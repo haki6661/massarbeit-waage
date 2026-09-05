@@ -54,6 +54,14 @@ Gerät, das direkt vor einem steht, nicht nur auf den Bildschirm daneben.
 - Die Basisvariante ohne Display kann eine Ampel höchstens über ihre
   Status-LED andeuten (rot → aus). Ob das reicht oder ob dieses Spiel dort
   einfach am Handy bleibt, ist nicht entschieden.
+- **Auf dem LED-Ring ist die Ampel dagegen schon fertig** (`LedRing::
+  startRaceLights()` / `raceLightsGreen()` / `abortRaceLights()`, siehe
+  Punkt 6): fünf rote Lampen, Haltezeit, gemeinsames Ausgehen. Beide
+  Varianten der offenen Frage oben sind dort bereits vorgesehen — Haltezeit
+  mitgeben (Waage lost aus) oder Grün von außen setzen (App lost aus). Was
+  fehlt, ist genau die BLE-Hälfte, die diese Methoden auslöst, plus die
+  TFT-Darstellung. Der Ring ist allerdings noch in keiner Variante
+  bestückt/aktiviert, taugt also nicht als alleiniger Weg.
 
 **Status:** Nicht begonnen. Das Spiel selbst läuft in der App bereits
 vollständig, auch ohne diese Ergänzung.
@@ -181,59 +189,56 @@ Gehäuse für die Basis, für die es bisher überhaupt keins gibt.
 
 **Status:** Nicht begonnen.
 
-## 6. WS2812B-RGB-LED-Ring im Deckel für visuelle Cues
+## 6. WS2812B-RGB-LED-Ring im Deckel bestücken und scharfschalten
 
 **Idee:** Einen Ring aus adressierbaren WS2812B-LEDs in den Deckel einbauen
-und darüber dieselben Zustände zeigen, die heute schon über `RemoteCue`/
-`DeviceUi::setActivePlayer()` laufen (Bereit, Away, Ergebnis-Güte,
-Spielerfarbe) - nur eben als Lichteffekt rundum sichtbar statt auf einem
-kleinen Display oder einer einzelnen Status-LED.
+und darüber dieselben Zustände zeigen, die schon über `RemoteCue`/
+`DeviceUi::setActivePlayer()` laufen — nur als Lichteffekt rundum sichtbar
+statt auf einem kleinen Display oder einer einzelnen Status-LED.
 
 **Warum:** Sowohl das TFT der Vision als auch die einfarbige Status-LED der
-Basis sind nur aus einem engen Blickwinkel gut lesbar - auf einer Party
-mit mehreren Leuten um den Tisch verliert das schnell. Ein Ring ist von
-allen Seiten sichtbar und deutlich festlicher. Passt auch protokollseitig
-gut: der Spielerfarbe-Badge (`COMMAND_PLAYER_TURN`, `0x14 <gameId><r><g><b>…`,
-siehe `include/Config.h`) transportiert schon eine RGB-Farbe - ein Ring
-könnte die 1:1 übernehmen, ohne dass sich am BLE-Protokoll etwas ändern
-muss. Und für die Startampel aus Punkt 1 wäre ein Lichtring ohnehin die
-naheliegendste Darstellung.
+Basis sind nur aus einem engen Blickwinkel gut lesbar — auf einer Party mit
+mehreren Leuten um den Tisch verliert das schnell. Ein Ring ist von allen
+Seiten sichtbar und deutlich festlicher.
 
-**Was dafür fehlt:**
+**Was schon da ist (Firmware):** `src/LedRing.h/.cpp` enthält die
+komplette Lichtlogik — Prioritäten, alle Muster (Formel-1-Startampel, Away je
+Spiel, Ergebnis-Güten, Wiege-Balken, Spielerfarbe, Verbindungszustand),
+Helligkeitsdeckel und Gamma. Der Ring läuft **parallel** zur bestehenden
+Anzeige mit (die frühere offene Frage "drittes Backend oder Erweiterung?" ist
+damit zugunsten der Erweiterung entschieden); `TftDisplay`/`LedStatusUi`
+reichen ihm über `attachLedRing()` dieselben Cue-/Spielerwechsel weiter, am
+BLE-Protokoll ändert sich kein Byte. In beiden Board-Profilen steht
+`MASSARBEIT_HAS_LED_RING` auf 0, der Code fällt also als toter Code weg,
+wird aber bei jedem Build mitkompiliert.
 
-- Eine WS2812B-Library (FastLED oder Adafruit_NeoPixel) als neue
-  Abhängigkeit.
-- Ein freier GPIO für die Datenleitung auf beiden Boards - auf der Basis
-  ist GPIO4 der naheliegende Kandidat (im Board-Profil `t_oi_plus.h` schon
-  als "für spätere Analog-Erweiterungen frei" vermerkt), auf der Vision ist
-  noch nicht durchgeprüft, welcher der vom Display/HX711/Tastern
-  unbenutzten Pins frei ist (siehe `t_display_s3.h`).
-- Ein drittes `DeviceUi`-Rendering-Backend (neben `TftDisplay` und
-  `LedStatusUi`) bzw. eine Erweiterung, die parallel zur bestehenden
-  Anzeige mitläuft - noch nicht entschieden, welches von beidem.
+**Was noch fehlt — Hardware und drei Handgriffe** (Schritt für Schritt im
+README, "LED-Ring nachrüsten"):
+
+- Ring beschaffen und in den Deckel bauen; Durchmesser/LED-Anzahl hängen am
+  Gehäuse und gehören deshalb mit Punkt 5 zusammen gedacht.
+- Aufbau gegenprüfen: Pegel 3,3V → 5V (ggf. Level-Shifter), Vorwiderstand
+  300-500Ω, Puffer-Kondensator ~1000µF, 5V-Versorgung getrennt vom Akku.
+  Erst danach `MASSARBEIT_HAS_LED_RING` auf 1 setzen, `…_COUNT` korrigieren
+  und die NeoPixel-Abhängigkeit in `platformio.ini` einkommentieren.
+- Die gewählten Datenpins am realen Board verifizieren (Vision GPIO13, Basis
+  GPIO4) — auf der Vision aus der offiziellen Pin-Tabelle abgeleitet, aber
+  noch nicht mit dem Multimeter bestätigt.
+- Praxistest der Helligkeit: `LED_RING_MAX_BRIGHTNESS` (Vorgabe 40/255) ist
+  am Schreibtisch gewählt, nicht im Partylicht gemessen. Dazu gehört die
+  Frage, wie viel Akkulaufzeit der Leerlauf-Ring tatsächlich kostet.
 
 **Offene Fragen, noch nicht entschieden:**
 
-- Beide Varianten, oder erstmal nur eine? Bei der Basis würde der Ring die
-  einzige echte Farbanzeige (ersetzt/ergänzt die einfarbige Status-LED),
-  bei der Vision käme er zusätzlich zum TFT.
-- Stromversorgung: WS2812B ziehen bis zu ~60mA je LED bei Vollweiß - bei
-  einem Ring mit mehreren LEDs gegen den kleinen Akku (16340 bzw. den
-  Vision-Akku) nicht vernachlässigbar. Braucht eine feste
-  Helligkeits-/Farbobergrenze im Code statt unein­geschränktem
-  `setBrightness()`, sonst leert sich der Akku im Party-Betrieb spürbar
-  schneller.
-- Pegelproblem: ESP32-GPIOs liefern 3.3V, WS2812B-Datenleitung ist für
-  5V-Logik spezifiziert. Kurze Leitungen laufen oft trotzdem stabil, das
-  muss aber am Aufbau gegengeprüft werden (ggf. Level-Shifter oder
-  Vorwiderstand + Puffer-Kondensator), bevor der Ring fest verbaut wird.
-- Ring-Durchmesser/LED-Anzahl hängen am Deckel-Formfaktor - gehört
-  eigentlich mit Punkt 5 (neue Gehäuse) zusammen gedacht, nicht isoliert.
-- Bildet der Ring nur die bestehenden `RemoteCue`-Zustände 1:1 ab, oder
-  entstehen eigene Lichtmuster (z.B. ein Lauflicht während des Wiegens),
-  die es bei TFT/Status-LED so nicht gibt?
+- Beide Varianten bestücken, oder erstmal nur eine? Bei der Basis wäre der
+  Ring die einzige echte Farbanzeige, bei der Vision käme er zum TFT hinzu.
+  Die Firmware unterstützt beides bereits unverändert.
+- Braucht die Basis dann noch ihre einfarbige Status-LED, oder wird sie
+  redundant? (Aktuell laufen beide parallel, was sich nicht widerspricht,
+  weil die Zustands-Rangfolge in beiden dieselbe ist.)
 
-**Status:** Nicht begonnen.
+**Status:** Firmware-Seite steht und ist ausgeschaltet eingebaut; offen ist
+die Hardware.
 
 ## 7. Siegerehrung der Olympiade auf dem Gerät
 
