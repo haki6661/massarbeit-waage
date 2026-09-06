@@ -315,6 +315,18 @@ weiter, die App merkt nichts davon.
 | 5V | über High-Side-Schalter, Gate an GPIO10 | über High-Side-Schalter, Gate an GPIO12 |
 | GND | GND (rechter Header) | GND |
 
+Zum High-Side-Schalter: P-MOSFET (AO3401, DMG3415, IRLML6402 o.ä.) mit
+100k-Gate-Pullup nach 5V, dessen Gate ein kleiner N-MOSFET (BSS138, 2N7002,
+BS170) gegen GND zieht, sobald der GPIO HIGH wird. Der N-MOSFET schaltet nur
+die ~50µA durch den Pullup, seine Ansteuerung ist also unkritisch - der
+P-MOSFET trägt den ganzen Ringstrom. Ein N-MOSFET allein reicht **nicht**:
+high-side kann er von 3,3V aus gar nicht schalten, und low-side (in der
+GND-Leitung) hebt er den Ring-GND gegen den Board-GND an, was die
+Datenleitung ihren Bezug kostet. Typen wie der BS170 sind zudem trotz
+TO-92-Bequemlichkeit keine Logic-Level-Typen (V_GS(th) bis 3,0V, R_DS(on)
+erst bei V_GS=10V spezifiziert) - bei 3,3V Gate-Spannung schalten sie je
+nach Exemplar nur teilweise durch.
+
 **Vor dem Festlöten prüfen:** ESP32-GPIOs geben 3,3V aus, WS2812B sind für
 5V-Logik spezifiziert (kurze Leitungen laufen meist trotzdem, sicher ist ein
 Level-Shifter); 300-500Ω in die Datenleitung, ~1000µF über die 5V-Versorgung

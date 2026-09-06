@@ -214,6 +214,13 @@ void LedRing::prepareForSleep() {
     // das ~10-16mA rund um die Uhr - mehr als alles andere im Deep Sleep
     // zusammen, und genug, um eine 700mAh-Zelle in unter zwei Tagen zu
     // leeren. Deshalb wird der Ring hier komplett stromlos geschaltet.
+    //
+    // Reihenfolge beachten: erst die Datenleitung auf LOW, dann die
+    // Versorgung weg. Ein auf HIGH stehengebliebener Datenpin wuerde sonst
+    // ueber die Eingangs-Schutzdioden der ersten LED in den stromlosen Ring
+    // zurueckspeisen - die LEDs glimmen dann schwach weiter und ziehen genau
+    // den Strom, den das Abschalten sparen soll.
+    digitalWrite(Pins::LED_RING_DATA, LOW);
     digitalWrite(Pins::LED_RING_POWER, LOW);
 #endif
     ready_ = false;
