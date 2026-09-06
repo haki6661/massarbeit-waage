@@ -227,6 +227,17 @@ README, "LED-Ring nachrüsten"):
 - Praxistest der Helligkeit: `LED_RING_MAX_BRIGHTNESS` (Vorgabe 40/255) ist
   am Schreibtisch gewählt, nicht im Partylicht gemessen. Dazu gehört die
   Frage, wie viel Akkulaufzeit der Leerlauf-Ring tatsächlich kostet.
+- **Ein Schalt-MOSFET in der 5V-Zuleitung des Rings, plus ein GPIO dafür.**
+  WS2812B ziehen ~0,6-1mA je LED für ihren internen Controller, auch wenn
+  sie schwarz sind - 16 LEDs sind ~10-16mA rund um die Uhr und leeren eine
+  700mAh-Zelle in unter zwei Tagen. `LedRing::prepareForSleep()` hilft
+  dagegen nichts, es macht die LEDs nur dunkel. Ohne diese Abschaltung ist
+  der ganze Deep Sleep wertlos, sobald ein Ring fest verbaut ist. Auf der
+  Basis wird der GPIO knapp: GPIO4 ist mit der Datenleitung schon verplant,
+  frei wären nur noch die JTAG-Pins neben dem HX711. Auf der Vision ist Platz
+  reichlich. Firmwareseitig ist das ein Pin-Define plus zwei Zeilen in
+  `LedRing::begin()`/`prepareForSleep()` - die Entscheidung ist eine
+  Hardware-Entscheidung, deshalb steht sie hier und nicht im Code.
 
 **Offene Fragen, noch nicht entschieden:**
 

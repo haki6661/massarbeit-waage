@@ -35,6 +35,12 @@
 // nicht, siehe dortiges Profil).
 #define MASSARBEIT_WAKEUP_USES_EXT0 1
 
+// HX711_SCK ist hier GPIO2 und damit RTC-faehig (am S3 sind das GPIO0-21).
+// Der Pin-Pegel laesst sich also ueber den Deep Sleep einfrieren - noetig,
+// damit der vor dem Schlafen ausgeloeste HX711-Standby auch haelt (siehe
+// Scale::powerDown() und enterDeepSleep() in main.cpp).
+#define MASSARBEIT_HX711_SCK_CAN_HOLD 1
+
 // Spannungsteiler vor dem Batterie-ADC (Faktor 2), siehe LilyGOs
 // GetBatteryVoltage-Beispiel.
 #define MASSARBEIT_BATTERY_DIVIDER 2
@@ -97,7 +103,9 @@ constexpr uint8_t HX711_SCK  = 2;
 //   GPIO3           - Strapping-Pin (JTAG-Quellwahl).
 // Ob GPIO13 auf dem konkreten Board-Revisionsstand wirklich frei liegt, vor
 // dem Festloeten einmal mit dem Multimeter gegenpruefen - dieselbe Vorsicht
-// wie bei den HX711-Pins oben. Zum Pegel-/Strom-Thema siehe t_oi_plus.h.
+// wie bei den HX711-Pins oben. Zum Pegel-Thema und vor allem zum RUHESTROM
+// des Rings (~0.6-1mA je LED, auch dunkel - braucht einen Schalt-MOSFET in
+// der 5V-Zuleitung, sonst ist der Deep Sleep wertlos) siehe t_oi_plus.h.
 constexpr uint8_t LED_RING_DATA = 13;
 
 } // namespace Pins

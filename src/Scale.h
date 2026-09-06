@@ -15,6 +15,20 @@ public:
 
     bool begin(); // false, wenn der HX711 nicht antwortet
     void tare(uint8_t times = 20);
+
+    // Schickt den HX711 in den Standby (~0.3µA statt ~1.4-1.6mA) - vor dem
+    // Deep Sleep aufzurufen, siehe enterDeepSleep() in main.cpp.
+    //
+    // Warum das ueberhaupt zaehlt: der schlafende ESP32 zieht nur wenige µA,
+    // der HX711 aber laeuft voellig unbeeindruckt weiter und ist damit im
+    // Schlaf der mit Abstand groesste Verbraucher der ganzen Schaltung. An
+    // einer 700mAh-Zelle sind das der Unterschied zwischen rund zwei Wochen
+    // und mehreren Monaten Standby.
+    //
+    // Kein Gegenstueck powerUp() noetig: aus dem Deep Sleep kommt die Waage
+    // ueber einen kompletten Neustart zurueck (kein Resume-Pfad), und
+    // Scale::begin() weckt den HX711 mit dem ersten Takt ohnehin wieder auf.
+    void powerDown();
     void set_scale(float factor); // setzt + speichert den Kalibrierfaktor (NVS)
 
     float getWeight();        // gefiltertes Gewicht, max. 1x/20ms neu berechnet

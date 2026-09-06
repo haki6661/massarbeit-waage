@@ -144,6 +144,21 @@ void enterDeepSleep() {
     // auch dann, wenn der Chip schon schlaeft.
     ledRing.prepareForSleep();
 
+    // Groesster Einzelposten im Schlaf: der HX711 zieht ~1.4-1.6mA und laeuft
+    // ohne dieses Kommando unbeeindruckt weiter, waehrend der ESP32 nur noch
+    // wenige µA braucht. An einer 700mAh-Zelle entscheidet allein das
+    // zwischen rund zwei Wochen und mehreren Monaten Standby.
+    scale.powerDown();
+#if MASSARBEIT_HX711_SCK_CAN_HOLD
+    // Der Standby haelt nur, solange PD_SCK HIGH bleibt - im Deep Sleep
+    // schaltet der Chip seine normalen GPIO-Treiber aber ab, der Pin wuerde
+    // hochohmig werden und der HX711 irgendwann von selbst wieder aufwachen.
+    // gpio_hold_en() friert den Pegel im RTC-Bereich ein, gpio_deep_sleep_
+    // hold_en() haelt diesen Latch ueber den Schlaf hinweg aktiv.
+    gpio_hold_en((gpio_num_t)Pins::HX711_SCK);
+    gpio_deep_sleep_hold_en();
+#endif
+
 #if MASSARBEIT_HAS_POWER_ON
     digitalWrite(Pins::POWER_ON, LOW); // Peripherie (Display etc.) stromlos schalten
 #endif
@@ -232,6 +247,19 @@ void setup() {
     if (wokeFromSleep) {
         Serial.println("[Power] Aufgewacht aus Deep Sleep (Aufweck-Taster).");
     }
+
+#if MASSARBEIT_HX711_SCK_CAN_HOLD
+    // Gegenstueck zum Pin-Latch aus enterDeepSleep(): der RTC-Latch ueberlebt
+    // den Aufwach-Reset und muss ausdruecklich geloest werden. Ohne das
+    // bliebe HX711_SCK dauerhaft HIGH festgenagelt - der HX711 kaeme aus dem
+    // Standby nie zurueck und die Waage meldete nach jedem Aufwachen
+    // "HX711 antwortet nicht". Unbedingt VOR scale.begin() (Bootschritt 2).
+    // Bedingungslos, nicht nur nach einem Aufwachen: nach einem Reset per
+    // Taster/USB mitten im Schlaf steht derselbe Latch, ohne dass die
+    // Aufweck-Ursache das noch verraet.
+    gpio_deep_sleep_hold_dis();
+    gpio_hold_dis((gpio_num_t)Pins::HX711_SCK);
+#endif
 
     // Muss VOR allem anderen geprueft werden, das Taste 2 anfasst. NICHT
     // pruefen, wenn dieser Boot ein Aufwachen aus dem Deep Sleep ist: das

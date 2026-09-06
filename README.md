@@ -217,6 +217,50 @@ Automatischer Deep Sleep nach 10 Minuten ohne Gewichtsänderung und ohne
 Tastendruck (`AUTO_SLEEP_TIMEOUT_MS` in `include/Config.h`) - außer während
 Dev-OTA aktiv ist.
 
+Aufgeweckt wird ausschließlich über einen **Taster** (Momentary gegen GND,
+interner Pullup) - kein rastender Schalter. Das Aufwachen läuft über den
+Pin-**Pegel** (`ext0` bzw. `esp_deep_sleep_enable_gpio_wakeup()`, beide auf
+LOW), und derselbe Pin hängt im Betrieb an `Buttons`/OneButton. Ein Schalter,
+der in Stellung "ein" stehen bleibt, hielte den Pin dauerhaft LOW: die
+Firmware läse das als ewig gehaltene Taste, würde nach 2s den Langdruck
+auslösen, sofort einschlafen - und beim immer noch LOW liegenden Pin sofort
+wieder aufwachen. Ein Schalter gehört, wenn überhaupt, in die
+**Batterieleitung** (echte Trennung für Lagerung; der T-OI Plus hat so einen
+bereits an Bord, der T-Display S3 nicht).
+
+### Wie lange hält der Akku?
+
+Im Deep Sleep zieht der ESP32 selbst nur wenige µA - die Laufzeit entscheidet
+sich an allem anderen. Größter Einzelposten war der HX711: er läuft mit
+~1,4-1,6mA unbeeindruckt weiter, wenn man ihn nicht ausdrücklich schlafen
+legt. `enterDeepSleep()` ruft dafür `Scale::powerDown()` auf (Standby laut
+Datenblatt, ~0,3µA) und friert `HX711_SCK` über den Schlaf hinweg auf HIGH
+ein, damit der Standby auch hält. Auf der Basis (C3) geht dieses Einfrieren
+nicht - `HX711_SCK` ist dort GPIO7 und nicht RTC-fähig; wer die volle
+Standby-Zeit braucht, ergänzt einen ~10k-Pullup nach 3V3 (siehe
+`t_oi_plus.h`).
+
+Grobe Größenordnung für eine 700mAh-Zelle (davon real ~600mAh nutzbar):
+
+| Ruhestrom | Laufzeit |
+|---|---|
+| ~10 µA (nur der Chip, theoretisch) | Jahre - wird nie erreicht |
+| ~50-250 µA (Board-Overhead: LDO, Laderegler, Batterie-Spannungsteiler) | **~100 Tage bis ~1,4 Jahre** |
+| ~1,7 mA (HX711 bliebe versorgt - so war es vor `powerDown()`) | ~2 Wochen |
+
+Alles Datenblatt- und Erfahrungswerte, keine Messung an einem konkreten
+Aufbau - der Board-Overhead schwankt je nach Revision deutlich und ist die
+eine Zahl, die man wirklich nachmessen muss. Ab etwa einem halben Jahr
+begrenzt ohnehin die Selbstentladung der Zelle (2-5%/Monat).
+
+**Wichtig für den LED-Ring:** WS2812B ziehen ~0,6-1mA je LED für ihren
+internen Controller, **auch wenn sie dunkel sind** - 16 LEDs sind ~10-16mA
+rund um die Uhr und leeren dieselbe Zelle in unter zwei Tagen.
+`LedRing::prepareForSleep()` hilft dagegen nicht, es macht die LEDs nur
+schwarz. Ein fest verbauter Ring braucht deshalb einen Schalt-MOSFET in
+seiner 5V-Zuleitung; dafür ist bisher kein GPIO vorgesehen (siehe
+`ROADMAP.md`).
+
 ### Was die Status-LED der Basis sagt
 
 Die LED ist einfarbig, also trägt allein das Zeitmuster die Information

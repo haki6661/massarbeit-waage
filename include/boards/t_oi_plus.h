@@ -62,6 +62,20 @@
 // enterDeepSleep() in main.cpp.
 #define MASSARBEIT_WAKEUP_USES_EXT0 0
 
+// HX711_SCK ist hier GPIO7 - RTC-faehig sind am C3 nur GPIO0-5, der Pegel
+// laesst sich ueber den Deep Sleep also NICHT einfrieren.
+//
+// Folge fuers Stromsparen: Scale::powerDown() schickt den HX711 zwar auch
+// hier in den Standby (~0.3µA statt ~1.4-1.6mA), aber sobald der Chip
+// schlaeft, wird PD_SCK hochohmig - ob der HX711 dann im Standby bleibt,
+// haengt allein an Leckstroemen und ist nicht garantiert. Wer die
+// Standby-Zeit der Basis wirklich braucht, loetet einen Pullup (~10k) von
+// HX711_SCK nach 3V3: dann haelt der Pegel auch ohne aktiven Treiber, und
+// im Betrieb zieht der GPIO ihn ohne Weiteres gegen den Widerstand nach
+// unten. Ohne diesen Widerstand einfach nachmessen, bevor man sich auf eine
+// Laufzeit verlaesst.
+#define MASSARBEIT_HX711_SCK_CAN_HOLD 0
+
 // Spannungsteiler vor dem Batterie-ADC: Faktor 2, exakt wie in LilyGOs
 // eigenem example/battery_voltage (`readADC_Cal(analogRead(BAT_ADC)) * 2`).
 #define MASSARBEIT_BATTERY_DIVIDER 2
@@ -123,6 +137,14 @@ constexpr uint8_t STATUS_LED = 3;
 //     ueber die 5V-Versorgung des Rings, sonst kann die erste LED sterben.
 //   - Strom: der Ring haengt an 5V, NICHT an der 16340-Zelle - das Board
 //     kann ihn nicht mitversorgen (siehe LED_RING_MAX_BRIGHTNESS).
+//   - RUHESTROM: jede WS2812B zieht ~0.6-1mA fuer ihren internen Controller,
+//     auch wenn sie schwarz ist. Bei 16 LEDs sind das ~10-16mA rund um die
+//     Uhr - das leert eine 700mAh-Zelle in unter zwei Tagen und macht den
+//     ganzen Deep Sleep zunichte. LedRing::prepareForSleep() hilft dagegen
+//     NICHT, es macht die LEDs nur dunkel. Der Ring braucht deshalb einen
+//     Schalt-MOSFET (P-Kanal high-side oder Load-Switch) in seiner
+//     5V-Zuleitung, der vor dem Schlafen abschaltet - dafuer ist noch kein
+//     GPIO vorgesehen (siehe ROADMAP.md, Punkt zum LED-Ring).
 constexpr uint8_t LED_RING_DATA = 4;
 
 // --- Batterie -------------------------------------------------------------
