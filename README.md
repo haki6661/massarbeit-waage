@@ -347,7 +347,25 @@ Halter. Die hat dieselbe Baugröße wie eine 16340, liefert aber nur ~3V und
 ist **nicht ladbar** - der TP4054 an Bord würde es beim nächsten USB-Kabel
 trotzdem versuchen.
 
-Zum High-Side-Schalter: P-MOSFET (AO3401, DMG3415, IRLML6402 o.ä.) mit
+Als High-Side-Schalter gibt es ein passendes Fertigmodul, das ohne ein
+einziges zusätzliches Bauteil auskommt: **Pololu #2810** ("Mini MOSFET Slide
+Switch with Reverse Voltage Protection, **LV**"). Zwei P-Kanal-MOSFETs,
+1,8-20V, ~6A, plus Verpolungsschutz - und der `ON`-Pin ist direkt für einen
+Mikrocontroller gedacht: über ~1V ein, LOW **oder nicht angeschlossen** aus.
+Genau unsere Polarität, der Ring ist im Deep Sleep und beim Boot also von
+selbst tot. Verdrahtung: `VIN` an die Quelle, `VOUT` an Ring-VCC, `GND` an
+GND, `ON` an `Pins::LED_RING_POWER`. Der Schiebeschalter auf dem Modul liegt
+parallel zum `ON`-Pin und bleibt in Stellung "aus", dann hat der GPIO allein
+das Sagen. Die **LV**-Variante nehmen, nicht SV - die will ≥4,5V und stiege
+im Akkubetrieb aus. Nicht verifiziert: der Ruhestrom des Moduls im
+ausgeschalteten Zustand (Pololu gibt ihn nicht an) - vor der
+Standby-Rechnung nachmessen.
+
+Von den billigen "MOSFET Trigger Switch"-Modulen (IRF520, D4184) ist
+abzuraten: fast alle sind Low-Side, nehmen dem Ring also den Massebezug für
+die Datenleitung, und der IRF520 ist kein Logic-Level-Typ.
+
+Diskret aufgebaut statt fertig: P-MOSFET (AO3401, DMG3415, IRLML6402 o.ä.) mit
 100k-Gate-Pullup nach 5V, dessen Gate ein kleiner N-MOSFET (BSS138, 2N7002,
 BS170) gegen GND zieht, sobald der GPIO HIGH wird. Der N-MOSFET schaltet nur
 die ~50µA durch den Pullup, seine Ansteuerung ist also unkritisch - der
