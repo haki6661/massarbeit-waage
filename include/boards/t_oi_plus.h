@@ -3,7 +3,13 @@
 // Board-Profil "Basis": LilyGO T-OI Plus V1.3 (Silkscreen "mini D1 PLUS") -
 // die abgespeckte Waage OHNE Display. Sie wiegt und funkt, sonst nichts; das
 // gesamte Spielgeschehen laeuft ohnehin auf dem Handy. Rueckmeldung am Geraet
-// gibt es nur ueber die Onboard-LED (siehe LedStatusUi) und Serial.
+// gibt es nur ueber die Onboard-LED (siehe LedStatusUi), die WS2812B-Leiste
+// und Serial.
+//
+// KEIN Taster: die Waage wird ueber den Schiebeschalter des Boards ein- und
+// ausgeschaltet, alles andere (Tara, Kalibrierung, Spielsteuerung) laeuft
+// ueber die App. Deshalb gibt es hier auch keinen Deep Sleep - ohne
+// Aufweck-Taster gaebe es keinen Weg zurueck.
 //
 // Board: ESP32-C3 (RISC-V, NICHT Xtensa wie der S3), 4MB Flash, CH340C als
 // USB-Serial-Wandler (also KEIN nativer USB -> Serial laeuft ueber UART0),
@@ -63,7 +69,11 @@
 // sitzt UND das Geraet wieder schlafen statt ausgeschaltet werden soll.
 #define MASSARBEIT_LED_RING_HAS_POWER_SWITCH 0
 #define MASSARBEIT_HAS_BATTERY     1
-#define MASSARBEIT_BUTTON_COUNT    1
+// Kein Taster verbaut. Steuert nicht nur die Tastenlogik, sondern auch, ob
+// es ueberhaupt einen Deep Sleep gibt (der braucht einen Aufweck-Taster) -
+// siehe main.cpp und AUTO_SLEEP_TIMEOUT_MS in Config.h. Wird per BLE als
+// "buttons":0 an die App gemeldet.
+#define MASSARBEIT_BUTTON_COUNT    0
 #define MASSARBEIT_HAS_POWER_ON    0
 // Kein Entwicklungs-OTA per WLAN auf der Basis: die Aktivierung haengt am
 // zweiten Taster (den es hier nicht gibt), und Firmware-Updates laufen
@@ -71,9 +81,11 @@
 // WLAN-/ArduinoOTA-Code im Binary.
 #define MASSARBEIT_HAS_DEV_OTA     0
 
-// Der C3 kennt KEIN ext0-Wakeup (das gibt es nur auf ESP32/S3). Aufgeweckt
-// wird stattdessen ueber esp_deep_sleep_enable_gpio_wakeup(), siehe
-// enterDeepSleep() in main.cpp.
+// Ohne Taster gibt es auf der Basis gar keinen Deep Sleep, dieser Wert ist
+// hier also ohne Wirkung - er bleibt stehen, damit das Profil vollstaendig
+// ist, falls die Variante doch einmal einen Aufweck-Taster bekommt. Sachlich
+// richtig ist er trotzdem: der C3 kennt kein ext0-Wakeup (das gibt es nur
+// auf ESP32/S3), geweckt wuerde er ueber esp_deep_sleep_enable_gpio_wakeup().
 #define MASSARBEIT_WAKEUP_USES_EXT0 0
 
 // HX711_SCK ist hier GPIO7 - RTC-faehig sind am C3 nur GPIO0-5, der Pegel
@@ -89,16 +101,6 @@
 // unten. Ohne diesen Widerstand einfach nachmessen, bevor man sich auf eine
 // Laufzeit verlaesst.
 #define MASSARBEIT_HX711_SCK_CAN_HOLD 0
-
-// Kein Aufweck-Taster verbaut: ein und aus macht allein der Schiebeschalter
-// des Boards (bzw. ein extern parallel dazu gelegter, siehe README). Der
-// trennt wirklich die Stromversorgung, statt nur schlafen zu legen - damit
-// braucht die Basis den Deep Sleep nicht mehr. Der Auto-Sleep MUSS in diesem
-// Aufbau aus bleiben (siehe AUTO_SLEEP_TIMEOUT_MS in Config.h): ohne
-// Aufweck-Taster waere die Waage nach dem Einschlafen bis zum Aus- und
-// Wiedereinschalten tot. Wird spaeter doch ein Taster angeloetet, hier auf 1
-// setzen - dann greift der Auto-Sleep automatisch wieder.
-#define MASSARBEIT_HAS_WAKE_BUTTON 0
 
 // Spannungsteiler vor dem Batterie-ADC: Faktor 2, exakt wie in LilyGOs
 // eigenem example/battery_voltage (`readADC_Cal(analogRead(BAT_ADC)) * 2`).
@@ -120,39 +122,22 @@ namespace Pins {
 constexpr uint8_t HX711_DOUT = 6;
 constexpr uint8_t HX711_SCK  = 7;
 
-// --- Taster ---------------------------------------------------------------
-// EIN externer Taster gegen GND, interner Pullup - kein Widerstand noetig.
-// Belegung siehe Buttons.h: kurz = Tara, lang (2s) = Deep Sleep,
-// Doppelklick = Kalibrierroutine. (Das Board selbst hat nur Reset und einen
-// Power-Schalter, keinen frei belegbaren Taster.)
-//
-// GPIO5 ist bewusst gewaehlt und sollte nicht ohne erneute Pruefung
-// umsortiert werden - auf dem C3 schraenken drei Dinge die Wahl ein:
-//   - Nur GPIO0-5 sind RTC-faehig, und NUR die koennen aus dem Deep Sleep
-//     aufwecken. Herausgefuehrt sind davon GPIO2, 4 und 5.
-//   - GPIO2 ist Strapping-Pin (und ausserdem schon der Batterie-ADC, s.u.).
-//     GPIO8/9 sind ebenfalls Strapping-Pins (GPIO8 traegt auf diesem Board
-//     sogar den Aufdruck "Boot") - ein beim Einschalten gedrueckter Taster
-//     an so einem Pin koennte den Chip in den Flash-Download-Modus booten
-//     statt in die Firmware. Genau das droht hier, weil derselbe Taster das
-//     Geraet aufweckt und beim folgenden Boot noch gedrueckt ist.
-//   - Bleiben GPIO4 und GPIO5. GPIO5 ist ADC2 (mit Funk unbrauchbar) und
-//     damit ohnehin der schlechtere ADC-Pin - also der bessere Taster-Pin,
-//     GPIO4 (ADC1) bleibt fuer spaetere Analog-Erweiterungen frei.
-constexpr uint8_t BUTTON_1      = 5;
-constexpr uint8_t WAKEUP_BUTTON = BUTTON_1;
+// --- Frei ------------------------------------------------------------------
+// GPIO5 war frueher der Taster-Pin und ist seit dessen Wegfall wieder frei.
+// Falls hier je wieder etwas hinkommt: GPIO5 ist RTC-faehig (am C3 nur
+// GPIO0-5) und damit einer der wenigen Pins, die aus dem Deep Sleep wecken
+// koennten; ADC2 liegt darauf, ist mit aktivem Funk aber ohnehin unbrauchbar.
+// GPIO4 ist mit der LED-Datenleitung belegt (s.u.).
 
 // --- Status-LED -----------------------------------------------------------
 // Onboard-LED, entspricht LED_BUILTIN der Arduino-Variante. GPIO3 ist auf
 // keine Stiftleiste herausgefuehrt, kann also gar nichts anderes sein.
 constexpr uint8_t STATUS_LED = 3;
 
-// --- WS2812B-Lichtring (vorbereitet, siehe MASSARBEIT_HAS_LED_RING) -------
-// GPIO4: der einzige Pin, den die Basis noch komplett frei hat (oben bei
-// BUTTON_1 als "bleibt fuer spaetere Erweiterungen frei" vermerkt - hier ist
-// die Erweiterung). Kein Strapping-Pin, kein Flash-/UART-Pin, auf die
-// Stiftleiste herausgefuehrt. Dass GPIO4 zugleich ADC1 ist, spielt hier
-// keine Rolle: als Datenausgang wird der ADC ohnehin nicht genutzt.
+// --- WS2812B-Lichtleiste (siehe MASSARBEIT_HAS_LED_RING) ------------------
+// GPIO4: kein Strapping-Pin (das sind am C3 GPIO2/8/9), kein Flash-/UART-Pin,
+// auf die Stiftleiste herausgefuehrt. Dass GPIO4 zugleich ADC1 ist, spielt
+// hier keine Rolle: als Datenausgang wird der ADC ohnehin nicht genutzt.
 //
 // Vor dem Festloeten beachten (siehe ROADMAP.md, Punkt zum LED-Ring):
 //   - Pegel: der C3 gibt 3.3V aus, WS2812B sind fuer 5V-Logik spezifiziert.

@@ -251,7 +251,7 @@ void LedRing::prepareForSleep() {
     // Ohne Schalt-MOSFET (aktueller Aufbau der Basis) bleiben die LEDs zwar
     // dunkel, ziehen aber weiter ihren Controller-Ruhestrom - dort wird das
     // Geraet ohnehin ueber den Schiebeschalter ganz ausgeschaltet statt
-    // schlafen gelegt (siehe MASSARBEIT_HAS_WAKE_BUTTON im Board-Profil).
+    // schlafen gelegt (die Basis hat keinen Taster, siehe Board-Profil).
     ready_ = false;
 }
 
@@ -698,7 +698,7 @@ void LedRing::renderWaitingForApp(uint32_t now) {
 
 /**
  * Leerlauf = "die Waage ist an". Seit die Basis keinen Auto-Sleep mehr hat
- * (sie wird am Schalter ausgeschaltet, siehe MASSARBEIT_HAS_WAKE_BUTTON), ist
+ * (sie wird am Schalter ausgeschaltet - kein Taster, kein Deep Sleep), ist
  * das der wichtigste Zustand ueberhaupt: ohne ihn kann niemand sehen, ob das
  * Geraet laeuft oder ob jemand vergessen hat, es einzuschalten - und ein
  * vergessenes, aber eingeschaltetes Geraet kostet den Akku.

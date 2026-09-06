@@ -231,27 +231,22 @@
 // ============================================================================
 // Power Management (Deep Sleep)
 // ----------------------------------------------------------------------------
-// Taste 1 LANG druecken (siehe Buttons.h) -> sofort in Deep Sleep. Zusaetzlich
-// automatisch nach AUTO_SLEEP_TIMEOUT_MS ohne Gewichtsaenderung UND ohne
-// Tastendruck. Aufwachen ueber Pins::WAKEUP_BUTTON aus dem Board-Profil: auf
-// der Vision Taste 2 (GPIO14), nicht Taste 1/GPIO0 (Strapping-Pin,
-// siehe main.cpp); auf der Basis der einzige Taster (GPIO33, ebenfalls kein
-// Strapping-Pin).
-// ============================================================================
-// Haengt am Aufweck-Taster: ohne einen waere ein eingeschlafenes Geraet bis
-// zum Aus- und Wiedereinschalten tot, deshalb schaltet 0 den Auto-Sleep dort
-// komplett ab. Welche Variante einen Taster hat, sagt das Board-Profil
-// (MASSARBEIT_HAS_WAKE_BUTTON) - so muss beim Bauen niemand daran denken.
+// Deep Sleep gibt es nur auf Varianten MIT Taster - ohne Aufweck-Taster gaebe
+// es keinen Weg zurueck. Auf der Vision: Taste 1 lang druecken (siehe
+// Buttons.h) oder automatisch nach AUTO_SLEEP_TIMEOUT_MS ohne
+// Gewichtsaenderung und ohne Tastendruck; aufgeweckt wird ueber Taste 2
+// (Pins::WAKEUP_BUTTON), bewusst nicht ueber Taste 1/GPIO0 (Strapping-Pin,
+// siehe main.cpp).
 //
-// Vision: Taste 2 weckt auf, Auto-Sleep bleibt aktiv.
-// Basis: kein Taster verbaut, ein/aus macht der Schiebeschalter des Boards
-// (der trennt Zelle UND USB, siehe t_oi_plus.h - also wirklich stromlos statt
-// nur schlafend). Tara und Kalibrierung laufen dort ueber die App
-// (BLE 0x01 bzw. 0x20/0x21), am Geraet fehlt dadurch nichts Wesentliches.
-#if MASSARBEIT_HAS_WAKE_BUTTON
+// Die Basis hat keinen Taster: sie wird ueber den Schiebeschalter des Boards
+// ausgeschaltet - wirklich stromlos statt schlafend - und kennt deshalb
+// weder Deep Sleep noch Auto-Sleep. Tara und Kalibrierung laufen dort ueber
+// die App (BLE 0x01 bzw. 0x20/0x21).
+// ============================================================================
+#if MASSARBEIT_BUTTON_COUNT >= 1
     #define AUTO_SLEEP_TIMEOUT_MS (10UL * 60UL * 1000UL) // 10 Minuten
 #else
-    #define AUTO_SLEEP_TIMEOUT_MS 0 // aus - siehe oben
+    #define AUTO_SLEEP_TIMEOUT_MS 0 // ohne Taster kein Deep Sleep, siehe oben
 #endif
 #define SLEEP_ACTIVITY_THRESHOLD_G 1.0f // Gewichtsaenderung, die den Inaktivitaets-Timer zuruecksetzt
 

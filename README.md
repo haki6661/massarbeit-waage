@@ -13,7 +13,7 @@ kurz "Vision" und "Basis".
 |---|---|---|
 | Board | LilyGO T-Display S3 (ESP32-S3, Xtensa) | LilyGO T-OI Plus V1.3 / "mini D1 PLUS" (ESP32-C3, RISC-V) |
 | Anzeige | 1,9" ST7789-TFT 170x320 | eine Status-LED |
-| Taster | zwei | einer (extern) |
+| Taster | zwei | keine (Bedienung über die App) |
 | Akku | ja | ja (16340-Halter + Laderegler an Bord) |
 | Build-Target | `t-display-s3` | `t-oi-plus` |
 | BLE-Name | `Massarbeit-Vision` | `Massarbeit` |
@@ -37,8 +37,8 @@ Aktueller Stand: HX711-Handling + Kalibrierroutine + BLE-Gewichts-/Akkuservice
 (inkl. Fernsteuerung der Anzeige durch die App, siehe Abschnitt "BLE"
 weiter unten) + TFT-Anzeige mit Spieler-Badge und spielspezifischen
 Away-Animationen + Pixel-Art-Sprite-Bootanimation (siehe `data/`) +
-Status-LED-Anzeige derselben Zustände auf der Basis + Taster-Bedienung +
-Deep-Sleep-Stromsparmodus + Firmware-Update direkt aus der App per BLE (kein
+Status-LED-Anzeige derselben Zustände auf der Basis + WS2812B-Lichtleiste +
+Taster-Bedienung und Deep-Sleep-Stromsparmodus (nur Vision) + Firmware-Update direkt aus der App per BLE (kein
 WLAN am Partyort nötig, siehe Abschnitt "Firmware-Update per BLE" weiter
 unten) + Entwicklungs-OTA per WLAN (nur Vision). Die Away-/Ergebnis-
 Animationen (nicht der Boot) sind weiterhin rein prozedural aus
@@ -95,14 +95,15 @@ Laderegler, Power-Schalter, Reset-Taster. PlatformIO-Boardprofil
 | Zweck | GPIO | Anmerkung |
 |---|---|---|
 | HX711 DOUT / SCK | 6 / 7 | auf der Stiftleiste (MTCK/MTDO), kein Strapping-Pin |
-| Taster (extern, gegen GND) | 5 | RTC-faehig -> weckt aus dem Deep Sleep, interner Pullup |
+| WS2812B-Datenleitung | 4 | über 300-500Ω, LEDs an `5V`/`GND` des Headers |
 | Status-LED | 3 | Onboard (`LED_BUILTIN` der Arduino-Variante), nicht herausgefuehrt |
 | Batteriespannung (ADC) | 2 | ADC1_CH2, Onboard-Spannungsteiler (Faktor 2) |
 
-Angeschlossen werden hier der HX711 und der externe Taster - die Status-LED
-und der Batterie-ADC haengen bereits fest am Board:
+Angeschlossen werden hier der HX711 und die LED-Leiste - die Status-LED und
+der Batterie-ADC haengen bereits fest am Board. **Einen Taster gibt es
+nicht:** ein/aus macht der Schiebeschalter des Boards, alles andere die App.
 
-![HX711- und Taster-Anschluss Maßarbeit](docs/pinout/massarbeit-basis-pinout.png)
+![HX711-Anschluss Maßarbeit](docs/pinout/massarbeit-basis-pinout.png)
 
 Quellen: [Xinyuan-LilyGO/LilyGo-T-OI-PLUS](https://github.com/Xinyuan-LilyGO/LilyGo-T-OI-PLUS)
 (Pinmap-Bild + `example/battery_voltage`) und die Arduino-Variante
@@ -111,14 +112,14 @@ Quellen: [Xinyuan-LilyGO/LilyGo-T-OI-PLUS](https://github.com/Xinyuan-LilyGO/Lil
 Drei Randbedingungen des C3 bestimmen die Pinwahl - **nicht** umsortieren,
 ohne sie zu pruefen:
 
-- **Nur GPIO0-5 sind RTC-faehig**, und nur die koennen aus dem Deep Sleep
-  aufwecken. Herausgefuehrt sind davon GPIO2, 4 und 5.
 - **GPIO2/8/9 sind Strapping-Pins** (GPIO8 traegt auf diesem Board sogar den
-  Aufdruck "Boot"). Ein beim Einschalten gedrueckter Taster an so einem Pin
-  koennte den Chip in den Flash-Download-Modus booten statt in die Firmware -
-  und genau das droht, weil derselbe Taster das Geraet aufweckt und beim
-  folgenden Boot noch gedrueckt ist. Bleiben GPIO4 und GPIO5; GPIO5 haengt an
-  ADC2 (mit Funk ohnehin unbrauchbar) und ist damit der bessere Taster-Pin.
+  Aufdruck "Boot") - dort gehoert nichts hin, was beim Einschalten einen
+  definierten Pegel erzwingt, sonst bootet der Chip womoeglich in den
+  Flash-Download-Modus statt in die Firmware.
+- **Nur GPIO0-5 sind RTC-faehig**, und nur die koennten aus einem Deep Sleep
+  aufwecken. Fuer die Basis ist das gegenstandslos (kein Taster, kein Deep
+  Sleep), aber gut zu wissen, falls die Variante das je bekommen soll:
+  herausgefuehrt sind davon GPIO2, 4 und 5, und GPIO5 ist frei.
 - **GPIO20/21 sind UART0** und gehen an den CH340 - freilassen, sonst ist der
   Serial-Monitor weg. (GPIO18/19, am C3 sonst der native USB, sind hier frei:
   das Board fuehrt sie als I2C/Grove heraus.)
@@ -142,7 +143,7 @@ das Serial-Log sagt, auf `1` aendern.
 |---|---|
 | `Scale.h/.cpp` (HX711, Smart-Filter, NVS-Kalibrierung) | 1:1 portiert, nur FlowRate-Kopplung entfernt |
 | BLE-Service (NimBLE, eigene Service-UUID) | Nur das simple "Bean Conqueror"-Float-Format uebernommen (siehe `include/Config.h`), GaggiMate-Protokoll bewusst weggelassen |
-| Kalibrier-Workflow (`Faktor = Rohwert / bekanntes Gewicht`) | Logik uebernommen, ueber Serial+Taster statt Web-Formular |
+| Kalibrier-Workflow (`Faktor = Rohwert / bekanntes Gewicht`) | Logik uebernommen, ueber Serial bzw. App statt Web-Formular |
 | Display, Touch-Sensoren, FlowRate, WebServer/WiFiManager, ESP-NOW-Relais | Nicht uebernommen (siehe Architektur-Ueberblick weiter oben im Chat) - fuer Maßarbeit nicht relevant |
 
 ## Projektstruktur
@@ -159,7 +160,7 @@ src/
   main.cpp              <- verdrahtet alle Module
   Scale.h/.cpp           <- HX711 (aus WeighMyBru2 portiert)
   BleWeightService.h/.cpp <- NimBLE-Service: Gewicht + Akkustand (Notify) + Tare/Anzeige-Kommandos (Write) + Geraete-Info
-  Buttons.h/.cpp          <- physische Taster statt Touch-Pads (OneButton-Lib)
+  Buttons.h/.cpp          <- physische Taster (OneButton-Lib), nur Vision
   DeviceUi.h              <- waehlt TftDisplay oder LedStatusUi je Variante
   DeviceUiTypes.h         <- RemoteCue/GameKind/LocalScreen (beide Varianten)
   TftDisplay.h/.cpp       <- nur Vision: Arduino_GFX-Ausgabe (Status,
@@ -170,7 +171,7 @@ src/
                             vorbereitet und standardmaessig AUS
                             (siehe "LED-Ring nachruesten")
   Battery.h/.cpp          <- Akkuspannung (kalibrierter ADC, aus LilyGOs Beispiel) + Prozent-Schaetzung
-  CalibrationRoutine.h/.cpp <- interaktive Kalibrierung ueber Serial+Taster
+  CalibrationRoutine.h/.cpp <- interaktive Kalibrierung ueber Serial
   OtaUpdater.h/.cpp        <- Firmware-Update per BLE (Chunks -> Update.h)
   DevOta.h/.cpp           <- WLAN + ArduinoOTA, nur Vision/Entwicklung
 scripts/
@@ -200,23 +201,24 @@ Aufwecken geht bewusst nur über Taste 2 (GPIO14), nicht über Taste 1: GPIO0
 gedrückt, könnte der Chip in den Flash-Download-Modus statt in die Firmware
 starten.
 
-### Basisvariante (ein Taster)
+### Basisvariante (ohne Taster)
 
-- **kurz**: Tara (auf der Vision übernimmt das die Spielauswahl, hier ist der Klick frei)
-- **lang (~2s)**: sofort Deep Sleep
-- **Doppelklick**: Kalibrierroutine starten
-- **drücken, während sie schläft**: aufwecken
-
-#### Der aktuell gebaute Aufbau der Basis
-
-Kein Taster, kein Schalt-MOSFET, keine Deep-Sleep-Automatik:
+Die Basis hat **keinen Taster**. Ein- und ausgeschaltet wird sie über den
+Schiebeschalter des Boards, alles andere läuft über die App:
 
 | | |
 |---|---|
-| Ein/Aus | Schiebeschalter des Boards (bzw. extern parallel dazu) |
+| Ein/Aus | Schiebeschalter des Boards (bzw. ein extern parallel dazu gelegter) |
+| Tara | App, BLE-Kommando `0x01` |
+| Kalibrierung | App (`0x20`/`0x21`) oder `cal` + Enter im Serial Monitor |
 | LEDs | 8er-Leiste, `DIN` an GPIO4, `5V`/`GND` an den Header |
-| Auto-Sleep | aus (`MASSARBEIT_HAS_WAKE_BUTTON 0` im Board-Profil) |
-| Tara / Kalibrierung | über die App (BLE `0x01` bzw. `0x20`/`0x21`) |
+| Deep Sleep / Auto-Sleep | gibt es nicht - ohne Aufweck-Taster gäbe es keinen Weg zurück |
+
+Der Schiebeschalter trennt die komplette System-Schiene (Zelle **und** USB),
+das Gerät ist damit wirklich stromlos statt schlafend - und der Ruhestrom der
+LED-Leiste ist gleich mit weg. Deep Sleep, Aufweck-Pin und Tastenlogik fallen
+auf dieser Variante komplett aus dem Binary (`MASSARBEIT_BUTTON_COUNT 0`,
+`Buttons.cpp` steht nicht im `build_src_filter`).
 
 Weil das Gerät nicht mehr von selbst einschläft, übernimmt die Leiste die
 Aufgabe zu zeigen, **dass die Waage überhaupt an ist**: im Leerlauf atmet sie
@@ -224,32 +226,10 @@ langsam im Akzentton und geht dabei nie ganz aus. Ohne dieses Signal wäre von
 außen nicht zu erkennen, ob jemand vergessen hat einzuschalten - oder
 auszuschalten, was den Akku kostet.
 
-#### Einfachste Variante: ganz ohne Taster
-
-Der Taster ist auf der Basis optional. Das Board hat bereits einen
-**Schiebeschalter**, der die komplette System-Schiene trennt (Zelle *und*
-USB, siehe Schaltplan-Ausschnitt weiter unten) - aus heißt damit wirklich
-aus, nicht "schläft": kein Deep Sleep nötig, kein Ruhestrom, auch nicht der
-eines angeschlossenen LED-Rings. Tara und Kalibrierung laufen ohnehin über
-die App (BLE `0x01` bzw. `0x20`/`0x21`), am Gerät fehlt also nichts
-Wesentliches.
-
-Dafür muss nur der **Auto-Sleep abgeschaltet** werden: ohne Aufweck-Taster
-wäre die Waage nach 10 Minuten sonst bis zum Aus-/Einschalten tot. In
-`include/Config.h`:
-
-```c
-#define AUTO_SLEEP_TIMEOUT_MS 0   // 0 = aus, Gerät wird am Board-Schalter ausgeschaltet
-```
-
-Ein LED-Ring braucht in diesem Aufbau auch keinen Schalt-MOSFET mehr - der
-Schiebeschalter nimmt ihm den Strom mit weg. Das gilt allerdings nur, solange
-der Ring am `5V`-Pin hängt und damit innerhalb der Belastbarkeit dieses
-Schalters bleibt (siehe `LED_RING_MAX_BRIGHTNESS`).
-
-Eine Geräte-Spielauswahl gibt es auf der Basis nicht - ohne Display ist
-nichts auszuwählen. Dev-OTA per WLAN entfällt ebenfalls (die Aktivierung
-hing am zweiten Taster); Firmware-Updates laufen per BLE aus der App.
+Eine Geräte-Spielauswahl gibt es auf der Basis nicht - ohne Display und ohne
+Taster ist weder etwas anzuzeigen noch durchzuschalten. Dev-OTA per WLAN
+entfällt ebenfalls (die Aktivierung hing am zweiten Taster); Firmware-Updates
+laufen per BLE aus der App.
 
 ### Beide
 
@@ -257,16 +237,17 @@ Automatischer Deep Sleep nach 10 Minuten ohne Gewichtsänderung und ohne
 Tastendruck (`AUTO_SLEEP_TIMEOUT_MS` in `include/Config.h`) - außer während
 Dev-OTA aktiv ist.
 
-Aufgeweckt wird ausschließlich über einen **Taster** (Momentary gegen GND,
-interner Pullup) - kein rastender Schalter. Das Aufwachen läuft über den
-Pin-**Pegel** (`ext0` bzw. `esp_deep_sleep_enable_gpio_wakeup()`, beide auf
-LOW), und derselbe Pin hängt im Betrieb an `Buttons`/OneButton. Ein Schalter,
-der in Stellung "ein" stehen bleibt, hielte den Pin dauerhaft LOW: die
-Firmware läse das als ewig gehaltene Taste, würde nach 2s den Langdruck
-auslösen, sofort einschlafen - und beim immer noch LOW liegenden Pin sofort
-wieder aufwachen. Ein Schalter gehört, wenn überhaupt, in die
-**Batterieleitung** (echte Trennung für Lagerung; der T-OI Plus hat so einen
-bereits an Bord, der T-Display S3 nicht).
+Beides gilt nur für die **Vision** - die Basis hat keinen Taster und damit
+auch keinen Deep Sleep, sie wird am Schiebeschalter ausgeschaltet.
+
+Auf der Vision wird ausschließlich über einen **Taster** aufgeweckt
+(Momentary gegen GND, interner Pullup), nicht über einen rastenden Schalter:
+das Aufwachen läuft über den Pin-**Pegel** (`ext0`, LOW), und derselbe Pin
+hängt im Betrieb an `Buttons`/OneButton. Ein Schalter, der in Stellung "ein"
+stehen bleibt, hielte den Pin dauerhaft LOW - die Firmware läse das als ewig
+gehaltene Taste, würde nach 2s den Langdruck auslösen, sofort einschlafen und
+beim immer noch LOW liegenden Pin sofort wieder aufwachen. Ein Schalter
+gehört, wenn überhaupt, in die **Batterieleitung**.
 
 ### Wie lange hält der Akku?
 
@@ -473,8 +454,9 @@ mitgeben (Waage lost aus) oder `startRaceLights(0)` und später
 ## Kalibrieren (Schritt 4 - mit der 3kg-Zelle neu ermitteln)
 
 1. Serial Monitor oeffnen (115200 Baud).
-2. Kalibrierung starten: Vision Taste 2 ca. 1,5s halten, Basis
-   Doppelklick auf den Taster - bis "Kalibrierung gestartet" erscheint.
+2. Kalibrierung starten: Vision Taste 2 ca. 1,5s halten, Basis `cal` + Enter
+   im Serial Monitor tippen - bis "Kalibrierung gestartet" erscheint.
+   (Beides geht auch aus der App, siehe BLE-Kommandos `0x20`/`0x21`.)
 3. Waage leeren, Enter im Serial Monitor druecken.
 4. Bekanntes Referenzgewicht auflegen, dessen Gramm-Zahl eingeben (z.B. `500`), Enter druecken.
 5. Neuer Kalibrierfaktor wird berechnet, geloggt, auf der Geraeteanzeige

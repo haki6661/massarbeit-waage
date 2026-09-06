@@ -47,10 +47,6 @@
 // Scale::powerDown() und enterDeepSleep() in main.cpp).
 #define MASSARBEIT_HX711_SCK_CAN_HOLD 1
 
-// Aufweck-Taster vorhanden (Taste 2) - der Auto-Sleep bleibt damit aktiv,
-// siehe AUTO_SLEEP_TIMEOUT_MS in Config.h.
-#define MASSARBEIT_HAS_WAKE_BUTTON 1
-
 // Spannungsteiler vor dem Batterie-ADC (Faktor 2), siehe LilyGOs
 // GetBatteryVoltage-Beispiel.
 #define MASSARBEIT_BATTERY_DIVIDER 2
