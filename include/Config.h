@@ -12,7 +12,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.9.1"
+#define FIRMWARE_VERSION "1.10.0"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -109,10 +109,26 @@
 //                       Referenzgewicht - siehe CalibrationRoutine.cpp fuer
 //                       dieselbe Formel). Unplausible Werte (<=0, NaN/Inf)
 //                       werden ignoriert, der bisherige Faktor bleibt aktiv.
-// 0x10-0x15 loesen KEINE eigene Gewichtslogik aus, sie steuern nur, was die
-// Geraeteanzeige gerade zeigt (TFT-Vollbild bzw. LED-Muster auf der Basis) -
-// die Waage selbst weiss nichts vom Spielzustand, die App entscheidet und
-// schickt nur das Anzeige-Kommando.
+//   0x30 <uint16 LE holdMs>
+//                       Startampel (Formel 1, siehe ROADMAP.md Punkt 1):
+//                       fuenf rote Lampen gehen nacheinander an (LedRing::
+//                       startRaceLights()), bleiben `holdMs` Millisekunden
+//                       stehen und gehen dann von selbst gemeinsam aus,
+//                       gefolgt von einem gruenen Umlauf - kein weiteres
+//                       Kommando noetig. holdMs = 0 heisst "die App gibt
+//                       Gruen von sich aus" (siehe 0x31); dann bleiben alle
+//                       fuenf Lampen stehen, bis 0x31/0x32 kommt. Ohne
+//                       angehaengten LED-Ring (siehe MASSARBEIT_HAS_LED_RING
+//                       im Board-Profil) ein No-Op - auf der Vision also
+//                       aktuell wirkungslos, siehe ROADMAP.md.
+//   0x31               Startampel: sofort Gruen (fuer holdMs = 0 oben, oder
+//                       um eine laufende Haltezeit vorzeitig zu beenden).
+//   0x32               Startampel: Fehlstart/Abbruch - kurzes rotes
+//                       Warnblinken, danach zurueck in den normalen Zustand.
+// 0x10-0x15 sowie 0x30-0x32 loesen KEINE eigene Gewichtslogik aus, sie
+// steuern nur, was die Geraeteanzeige gerade zeigt (TFT-Vollbild bzw.
+// LED-Muster auf der Basis) - die Waage selbst weiss nichts vom Spielzustand,
+// die App entscheidet und schickt nur das Anzeige-Kommando.
 //
 // GameKind-Werte fuer <gameId> (0x13/0x14, siehe DeviceUiTypes.h):
 //   0 = keins/generisch, 1 = Golf, 2 = Dart, 3 = Blackjack, 4 = Tower, 5 = Scale, 6 = Boxen

@@ -54,6 +54,15 @@ public:
     void setActivePlayer(GameKind game, uint16_t color565, const String& name);
     void clearActivePlayer();
 
+    // Von BleWeightService bei einem 0x30/0x31/0x32-Kommando aufgerufen
+    // (Formel-1-Startampel, siehe ROADMAP.md Punkt 1) - komplett an den
+    // angehaengten LED-Ring weitergereicht (siehe LedRing::startRaceLights()/
+    // raceLightsGreen()/abortRaceLights()). Die einfarbige Status-LED zeigt
+    // dazu nichts Eigenes - ohne angehaengten Ring ein reines No-Op.
+    void startRaceLights(uint16_t holdMs = 0);
+    void raceLightsGreen();
+    void abortRaceLights();
+
     // Ohne Display gibt es nichts auszuwaehlen - die Geraete-Spielauswahl
     // entfaellt auf der Basis ersatzlos. Bewusst als leere Methoden erhalten,
     // damit die Oberflaeche beider Varianten identisch bleibt (main.cpp ruft
