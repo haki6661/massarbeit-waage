@@ -39,15 +39,29 @@
 // NeoPixel-Beispiele in LilyGOs Repo gehoeren zum aufsteckbaren RGB-Shield
 // (7 Pixel, Datenpin ueber DIP-Schalter waehlbar), nicht zum Board selbst.
 #define MASSARBEIT_STATUS_LED_RGB  0
-// WS2812B-Lichtring im Deckel: vorbereitet, aber AUS - die Firmware bringt
-// die komplette Lichtlogik schon mit (src/LedRing.h), es fehlt nur die
-// Hardware. Auf 1 setzen, sobald ein Ring an Pins::LED_RING_DATA haengt UND
-// die NeoPixel-Abhaengigkeit in platformio.ini aktiviert ist; dann auch
-// MASSARBEIT_LED_RING_COUNT auf die tatsaechliche LED-Zahl korrigieren.
-// Fuer die Basis waere der Ring die erste echte Farbanzeige ueberhaupt - die
-// einfarbige Onboard-LED laeuft unveraendert weiter, beide ergaenzen sich.
-#define MASSARBEIT_HAS_LED_RING    0
-#define MASSARBEIT_LED_RING_COUNT  16
+// WS2812B-Lichtleiste: AKTIV. Erste bestueckte Ausbaustufe ist eine gerade
+// 8er-Leiste am Steckbrett-/Werkbankaufbau, noch kein Ring im Deckel - die
+// Lichtlogik ist dieselbe (src/LedRing.h), nur die Geometrie unterscheidet
+// sich (siehe MASSARBEIT_LED_RING_IS_STRIP). Die einfarbige Onboard-LED
+// laeuft unveraendert weiter, beide ergaenzen sich.
+// Beim Wechsel auf einen echten Ring: COUNT anpassen und IS_STRIP auf 0.
+#define MASSARBEIT_HAS_LED_RING    1
+#define MASSARBEIT_LED_RING_COUNT  8
+
+// 1 = gerade Leiste, 0 = geschlossener Ring. Bestimmt, wie sich bewegte
+// Muster verhalten: auf einem Ring laufen sie im Kreis weiter, auf einer
+// Leiste pendeln sie hin und her. Ein Punkt, der am Ende der Leiste
+// verschwindet und vorne wieder auftaucht, sieht dort nach Fehler aus, nicht
+// nach Animation.
+#define MASSARBEIT_LED_RING_IS_STRIP 1
+
+// 1 = die 5V-Zuleitung haengt an einem Schalt-MOSFET an Pins::LED_RING_POWER
+// (siehe README), 0 = fest verdrahtet. Beim aktuellen Aufbau haengt die
+// Leiste direkt an 5V und GND, abgeschaltet wird alles zusammen ueber den
+// Schiebeschalter des Boards - der trennt die komplette System-Schiene, also
+// auch die LEDs. Der MOSFET wird erst noetig, wenn der Ring fest im Deckel
+// sitzt UND das Geraet wieder schlafen statt ausgeschaltet werden soll.
+#define MASSARBEIT_LED_RING_HAS_POWER_SWITCH 0
 #define MASSARBEIT_HAS_BATTERY     1
 #define MASSARBEIT_BUTTON_COUNT    1
 #define MASSARBEIT_HAS_POWER_ON    0
@@ -75,6 +89,16 @@
 // unten. Ohne diesen Widerstand einfach nachmessen, bevor man sich auf eine
 // Laufzeit verlaesst.
 #define MASSARBEIT_HX711_SCK_CAN_HOLD 0
+
+// Kein Aufweck-Taster verbaut: ein und aus macht allein der Schiebeschalter
+// des Boards (bzw. ein extern parallel dazu gelegter, siehe README). Der
+// trennt wirklich die Stromversorgung, statt nur schlafen zu legen - damit
+// braucht die Basis den Deep Sleep nicht mehr. Der Auto-Sleep MUSS in diesem
+// Aufbau aus bleiben (siehe AUTO_SLEEP_TIMEOUT_MS in Config.h): ohne
+// Aufweck-Taster waere die Waage nach dem Einschlafen bis zum Aus- und
+// Wiedereinschalten tot. Wird spaeter doch ein Taster angeloetet, hier auf 1
+// setzen - dann greift der Auto-Sleep automatisch wieder.
+#define MASSARBEIT_HAS_WAKE_BUTTON 0
 
 // Spannungsteiler vor dem Batterie-ADC: Faktor 2, exakt wie in LilyGOs
 // eigenem example/battery_voltage (`readADC_Cal(analogRead(BAT_ADC)) * 2`).

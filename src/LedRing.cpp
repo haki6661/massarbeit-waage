@@ -60,6 +60,19 @@ float LedRing::breathe(uint32_t elapsedMs, uint16_t periodMs) {
     return 0.5f * (1.0f - cosf(2.0f * PI * phase));
 }
 
+float LedRing::travel(uint32_t elapsedMs, uint32_t periodMs) const {
+    if (periodMs == 0 || COUNT == 0) return 0.0f;
+    float phase = (elapsedMs % periodMs) / static_cast<float>(periodMs); // 0..1
+    if (!IS_STRIP) return phase * COUNT;
+
+    // Leiste: hin und zurueck statt rundum. Ein voller Zyklus ist einmal hin
+    // UND zurueck, damit die Bewegung bei gleicher periodMs nicht doppelt so
+    // hektisch wirkt wie auf dem Ring.
+    float span = (COUNT > 1) ? static_cast<float>(COUNT - 1) : 0.0f;
+    float p = phase * 2.0f;
+    return (p <= 1.0f) ? p * span : (2.0f - p) * span;
+}
+
 LedRing::Rgb LedRing::scaled(Rgb color, float factor) {
     if (factor <= 0.0f) return {0, 0, 0};
     if (factor > 1.0f) factor = 1.0f;
@@ -122,16 +135,26 @@ void LedRing::setPixel(int16_t index, Rgb color, float scale) {
 
 void LedRing::setPixelBlended(float position, Rgb color, float scale) {
     if (COUNT == 0) return;
-    float wrapped = fmodf(position, static_cast<float>(COUNT));
-    if (wrapped < 0.0f) wrapped += COUNT;
-    int16_t low = static_cast<int16_t>(wrapped);
+    float wrapped = position;
+    if (!IS_STRIP) {
+        wrapped = fmodf(position, static_cast<float>(COUNT));
+        if (wrapped < 0.0f) wrapped += COUNT;
+    }
+    int16_t low = static_cast<int16_t>(floorf(wrapped));
     float frac = wrapped - low;
 
     // Additiv statt ueberschreibend: mehrere Punkte duerfen sich ueberlagern
     // (z.B. Komet-Schweif), ohne sich gegenseitig auszuloeschen.
+    // Auf der Leiste faellt weg, was ueber den Rand hinausragt (ein Schweif
+    // laeuft dort aus dem Bild) - auf dem Ring laeuft es rundum weiter.
     auto add = [this](int16_t index, Rgb c) {
-        int32_t i = index % static_cast<int32_t>(COUNT);
-        if (i < 0) i += COUNT;
+        int32_t i = index;
+        if (IS_STRIP) {
+            if (i < 0 || i >= static_cast<int32_t>(COUNT)) return;
+        } else {
+            i %= static_cast<int32_t>(COUNT);
+            if (i < 0) i += COUNT;
+        }
         buffer_[i].r = addChannel(buffer_[i].r, c.r);
         buffer_[i].g = addChannel(buffer_[i].g, c.g);
         buffer_[i].b = addChannel(buffer_[i].b, c.b);
@@ -185,6 +208,7 @@ void LedRing::begin() {
         return;
     }
 #if MASSARBEIT_HAS_LED_RING
+#if MASSARBEIT_LED_RING_HAS_POWER_SWITCH
     // Erst Strom auf den Ring, dann der erste Datenrahmen: die WS2812B
     // brauchen einen Moment, bis ihre interne Logik nach dem Einschalten
     // sauber steht - ein Frame in diese Phase hinein kommt bei der ersten
@@ -192,6 +216,7 @@ void LedRing::begin() {
     pinMode(Pins::LED_RING_POWER, OUTPUT);
     digitalWrite(Pins::LED_RING_POWER, HIGH);
     delay(2);
+#endif
 
     strip.begin();
     strip.clear();
@@ -208,7 +233,7 @@ void LedRing::prepareForSleep() {
     if (!ENABLED || !ready_) return;
     clear();
     show();
-#if MASSARBEIT_HAS_LED_RING
+#if MASSARBEIT_HAS_LED_RING && MASSARBEIT_LED_RING_HAS_POWER_SWITCH
     // Dunkelschalten allein reicht NICHT: jede WS2812B zieht ~0.6-1mA fuer
     // ihren internen Controller, auch wenn sie schwarz ist. Bei 16 LEDs sind
     // das ~10-16mA rund um die Uhr - mehr als alles andere im Deep Sleep
@@ -223,6 +248,10 @@ void LedRing::prepareForSleep() {
     digitalWrite(Pins::LED_RING_DATA, LOW);
     digitalWrite(Pins::LED_RING_POWER, LOW);
 #endif
+    // Ohne Schalt-MOSFET (aktueller Aufbau der Basis) bleiben die LEDs zwar
+    // dunkel, ziehen aber weiter ihren Controller-Ruhestrom - dort wird das
+    // Geraet ohnehin ueber den Schiebeschalter ganz ausgeschaltet statt
+    // schlafen gelegt (siehe MASSARBEIT_HAS_WAKE_BUTTON im Board-Profil).
     ready_ = false;
 }
 
@@ -358,6 +387,28 @@ void LedRing::renderFrame(uint32_t now, bool hx711Connected, bool bleConnected) 
     }
 }
 
+// Eine der fuenf Startlampen, gleichmaessig ueber die verfuegbaren LEDs
+// verteilt. Bewusst auf ganze LEDs gerundet statt weich eingeblendet: eine
+// Ampel muss man zaehlen koennen ("noch zwei, dann geht's los"), und auf
+// einer 8er-Leiste verschmiert eine zwischen zwei LEDs liegende Lampe genau
+// diese Information. Passen mehr LEDs als Lampen aufs Band, bekommt jede
+// Lampe zusaetzlich einen schwachen Nachbarn und wirkt dadurch breiter.
+void LedRing::drawRaceLamp(uint8_t lamp) {
+    constexpr uint8_t LAMP_COUNT = 5;
+    if (COUNT == 0) return;
+    if (COUNT <= LAMP_COUNT) {
+        setPixel(static_cast<int16_t>(lamp % COUNT), {DANGER_R, 0, 0});
+        return;
+    }
+    // Erste Lampe ganz aussen, letzte ganz am anderen Ende - auf der Leiste
+    // sieht das aus wie die Lichtbruecke ueber der Startgeraden.
+    float span = IS_STRIP ? static_cast<float>(COUNT - 1)
+                          : static_cast<float>(COUNT) * (static_cast<float>(LAMP_COUNT - 1) / LAMP_COUNT);
+    int16_t idx = static_cast<int16_t>(lroundf(lamp * span / (LAMP_COUNT - 1)));
+    setPixel(idx, {DANGER_R, 0, 0});
+    if (COUNT >= 2 * LAMP_COUNT) setPixel(idx + 1, {DANGER_R, 0, 0}, 0.45f);
+}
+
 // --- Startampel (Formel 1) --------------------------------------------------
 // Fuenf Lampenpaare gleichmaessig ueber den Ring verteilt, wie die fuenf
 // Lichtbruecken ueber der Startgeraden: alle LED_RING_RACE_LAMP_INTERVAL_MS
@@ -382,21 +433,13 @@ void LedRing::renderRaceLights(uint32_t now) {
                 }
             }
             clear();
-            for (uint8_t lamp = 0; lamp < lit; ++lamp) {
-                float center = (static_cast<float>(lamp) / LAMP_COUNT) * COUNT;
-                setPixelBlended(center, {DANGER_R, 0, 0});
-                setPixelBlended(center + 1.0f, {DANGER_R, 0, 0}, 0.55f);
-            }
+            for (uint8_t lamp = 0; lamp < lit; ++lamp) drawRaceLamp(lamp);
             break;
         }
 
         case RacePhase::Hold: {
             clear();
-            for (uint8_t lamp = 0; lamp < LAMP_COUNT; ++lamp) {
-                float center = (static_cast<float>(lamp) / LAMP_COUNT) * COUNT;
-                setPixelBlended(center, {DANGER_R, 0, 0});
-                setPixelBlended(center + 1.0f, {DANGER_R, 0, 0}, 0.55f);
-            }
+            for (uint8_t lamp = 0; lamp < LAMP_COUNT; ++lamp) drawRaceLamp(lamp);
             // raceHoldMs_ == 0 heisst "die App gibt Gruen" - dann hier
             // bewusst kein Timeout, sonst waere die Ampel bei einer
             // laengeren Haltezeit vorzeitig aus.
@@ -475,11 +518,12 @@ void LedRing::renderCue(uint32_t now, RemoteCue cue) {
             break;
 
         case RemoteCue::ResultPerfect: {
-            // Volltreffer: heller gruener Grund, darauf ein schneller Umlauf.
+            // Volltreffer: heller gruener Grund, darauf ein schneller heller
+            // Laeufer. Auf der Leiste flitzt er hin und her, auf dem Ring rundum.
             fillAll({SUCCESS_R, SUCCESS_G, SUCCESS_B}, 0.45f);
-            float head = (elapsed / 45.0f);
-            for (uint8_t tail = 0; tail < 4; ++tail) {
-                setPixelBlended(head - tail, {255, 255, 255}, 1.0f - tail * 0.25f);
+            float head = travel(elapsed, 420);
+            for (uint8_t t = 0; t < TAIL; ++t) {
+                setPixelBlended(head - t, {255, 255, 255}, 1.0f - t * (0.8f / TAIL));
             }
             break;
         }
@@ -523,31 +567,36 @@ void LedRing::renderAway(uint32_t now, GameKind game) {
             // Ball rollt seine Bahn - ein weisser Punkt mit Schweif auf
             // gruenem Fairway-Untergrund.
             fillAll(color, 0.12f);
-            float head = elapsed / 90.0f;
-            for (uint8_t tail = 0; tail < 5; ++tail) {
-                setPixelBlended(head - tail, {255, 255, 255}, 1.0f - tail * 0.2f);
+            float head = travel(elapsed, 1600);
+            for (uint8_t t = 0; t < TAIL; ++t) {
+                setPixelBlended(head - t, {255, 255, 255}, 1.0f - t * (0.85f / TAIL));
             }
             break;
         }
 
         case GameKind::Dart: {
-            // Pfeil fliegt aufs Ziel: der Punkt laeuft immer schneller auf
-            // die 12-Uhr-Position zu und schlaegt dort als Blitz ein.
+            // Pfeil fliegt aufs Ziel: der Punkt laeuft beschleunigt auf das
+            // Ende zu (Leiste) bzw. auf die 12-Uhr-Position (Ring) und schlaegt
+            // dort als Blitz ein.
             constexpr uint32_t FLIGHT_MS = 900;
             uint32_t phase = elapsed % (FLIGHT_MS + 300);
+            float last = (COUNT > 0) ? static_cast<float>(COUNT - 1) : 0.0f;
             if (phase < FLIGHT_MS) {
                 float t = phase / static_cast<float>(FLIGHT_MS);
                 float eased = t * t; // beschleunigt, wie ein geworfener Pfeil
-                setPixelBlended(COUNT * (1.0f - eased) * 0.5f, color);
+                setPixelBlended(eased * last, color);
+                // Kurzer Schweif, damit die Bewegung auch bei wenigen LEDs
+                // als Flug und nicht als Springen gelesen wird.
+                setPixelBlended(eased * last - 1.0f, color, 0.35f);
             } else {
                 fillAll(color, 0.6f);
-                setPixel(0, {255, 255, 255});
+                setPixel(static_cast<int16_t>(last), {255, 255, 255});
             }
             break;
         }
 
         case GameKind::Blackjack: {
-            // Karte fuer Karte: der Ring fuellt sich in Vierteln, danach
+            // Karte fuer Karte: die Anzeige fuellt sich in Vierteln, danach
             // wieder von vorn - das Austeilen als Rhythmus statt als Bild.
             uint8_t cards = static_cast<uint8_t>((elapsed / 600) % 5);
             fillArc(cards / 4.0f, color);
@@ -584,9 +633,9 @@ void LedRing::renderAway(uint32_t now, GameKind game) {
         default: {
             // Generisch (auch GameKind::Scale): ruhiger Komet - "es laeuft
             // gerade etwas, wir warten".
-            float head = elapsed / 120.0f;
-            for (uint8_t tail = 0; tail < 6; ++tail) {
-                setPixelBlended(head - tail, color, 1.0f - tail * 0.16f);
+            float head = travel(elapsed, 2000);
+            for (uint8_t t = 0; t < TAIL; ++t) {
+                setPixelBlended(head - t, color, 1.0f - t * (0.8f / TAIL));
             }
             break;
         }
@@ -629,20 +678,36 @@ bool LedRing::renderWeighing(uint32_t now) {
 
 void LedRing::renderActivePlayer(uint32_t now) {
     // Spielerfarbe, langsam atmend: "du bist dran" soll praesent sein, ohne
-    // ueber einen ganzen Zug hinweg zu nerven.
-    fillAll(activePlayerColor_, 0.25f + 0.45f * breathe(now - stateStartMs_, 2600));
+    // ueber einen ganzen Zug hinweg zu nerven. Untergrenze wie im Leerlauf
+    // bewusst ueber Null - eine Anzeige, die zwischendurch ganz ausgeht, liest
+    // sich als abgeschaltetes Geraet.
+    fillAll(activePlayerColor_, 0.30f + 0.45f * breathe(now - stateStartMs_, 2600));
 }
 
 void LedRing::renderWaitingForApp(uint32_t now) {
-    // Einzelner blauer Punkt kreist - dieselbe Aussage wie der einsame Blitz
-    // der Status-LED ("Waage laeuft, aber niemand ist verbunden").
+    // Einzelner blauer Punkt wandert - dieselbe Aussage wie der einsame Blitz
+    // der Status-LED ("Waage laeuft, aber niemand ist verbunden"). Bewusst
+    // deutlich sichtbar: solange keine App dranhaengt, ist das die einzige
+    // Rueckmeldung, dass das Geraet ueberhaupt an ist.
     clear();
-    setPixelBlended((now - stateStartMs_) / 160.0f, {INFO_R, INFO_G, INFO_B});
+    uint32_t elapsed = now - stateStartMs_;
+    float head = travel(elapsed, 2400);
+    setPixelBlended(head, {INFO_R, INFO_G, INFO_B});
+    setPixelBlended(head - 1.0f, {INFO_R, INFO_G, INFO_B}, 0.3f);
 }
 
+/**
+ * Leerlauf = "die Waage ist an". Seit die Basis keinen Auto-Sleep mehr hat
+ * (sie wird am Schalter ausgeschaltet, siehe MASSARBEIT_HAS_WAKE_BUTTON), ist
+ * das der wichtigste Zustand ueberhaupt: ohne ihn kann niemand sehen, ob das
+ * Geraet laeuft oder ob jemand vergessen hat, es einzuschalten - und ein
+ * vergessenes, aber eingeschaltetes Geraet kostet den Akku.
+ *
+ * Deshalb ein ruhiges, aber deutlich sichtbares Atmen statt des vorherigen
+ * Glimmens: es geht nie ganz aus (sonst wirkt es in der dunklen Phase wie
+ * "aus"), und es atmet langsam genug, um nicht zu nerven, wenn die Waage den
+ * ganzen Abend danebensteht.
+ */
 void LedRing::renderIdle(uint32_t now) {
-    // Sehr schwaches Atmen im Akzentton. Bewusst gedaempft: der Leerlauf ist
-    // der mit Abstand haeufigste Zustand, hier entscheidet sich, wie viel
-    // Akku der Ring ueber einen Abend kostet.
-    fillAll({ACCENT_R, ACCENT_G, ACCENT_B}, 0.06f + 0.10f * breathe(now - stateStartMs_, 4000));
+    fillAll({ACCENT_R, ACCENT_G, ACCENT_B}, 0.12f + 0.28f * breathe(now - stateStartMs_, 3600));
 }

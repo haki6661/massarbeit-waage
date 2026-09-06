@@ -60,8 +60,9 @@ Gerät, das direkt vor einem steht, nicht nur auf den Bildschirm daneben.
   Varianten der offenen Frage oben sind dort bereits vorgesehen — Haltezeit
   mitgeben (Waage lost aus) oder Grün von außen setzen (App lost aus). Was
   fehlt, ist genau die BLE-Hälfte, die diese Methoden auslöst, plus die
-  TFT-Darstellung. Der Ring ist allerdings noch in keiner Variante
-  bestückt/aktiviert, taugt also nicht als alleiniger Weg.
+  TFT-Darstellung. Auf der Basis sind die LEDs inzwischen bestückt (8er-
+  Leiste), dort wäre die Ampel also sofort sichtbar; auf der Vision noch
+  nicht.
 
 **Status:** Nicht begonnen. Das Spiel selbst läuft in der App bereits
 vollständig, auch ohne diese Ergänzung.
@@ -250,8 +251,11 @@ README, "LED-Ring nachrüsten"):
   redundant? (Aktuell laufen beide parallel, was sich nicht widerspricht,
   weil die Zustands-Rangfolge in beiden dieselbe ist.)
 
-**Status:** Firmware-Seite steht und ist ausgeschaltet eingebaut; offen ist
-die Hardware.
+**Status:** Auf der **Basis in Betrieb** — erste Ausbaustufe ist eine gerade
+8er-Leiste am Werkbankaufbau, direkt an `5V`/`GND` des Boards, ohne
+Schalt-MOSFET (ausgeschaltet wird alles zusammen über den Schiebeschalter).
+Offen bleiben: der eigentliche Ring im Deckel, der MOSFET für den Fall, dass
+die Basis wieder schlafen statt ausgeschaltet werden soll, und die Vision.
 
 ## 7. Siegerehrung der Olympiade auf dem Gerät
 

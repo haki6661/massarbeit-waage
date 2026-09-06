@@ -26,6 +26,12 @@
 // Zustaende nur rundum sichtbar nach aussen.
 #define MASSARBEIT_HAS_LED_RING    0
 #define MASSARBEIT_LED_RING_COUNT  16
+// Geschlossener Ring (0) statt gerader Leiste - auf der Vision ist der Ring
+// von vornherein fuer den Deckel gedacht, siehe t_oi_plus.h.
+#define MASSARBEIT_LED_RING_IS_STRIP 0
+// Hier mit Schalt-MOSFET geplant: die Vision behaelt ihren Deep Sleep (sie
+// hat einen Aufweck-Taster), und im Schlaf muessen die LEDs stromlos werden.
+#define MASSARBEIT_LED_RING_HAS_POWER_SWITCH 1
 #define MASSARBEIT_HAS_BATTERY     1
 #define MASSARBEIT_BUTTON_COUNT    2
 #define MASSARBEIT_HAS_POWER_ON    1
@@ -40,6 +46,10 @@
 // damit der vor dem Schlafen ausgeloeste HX711-Standby auch haelt (siehe
 // Scale::powerDown() und enterDeepSleep() in main.cpp).
 #define MASSARBEIT_HX711_SCK_CAN_HOLD 1
+
+// Aufweck-Taster vorhanden (Taste 2) - der Auto-Sleep bleibt damit aktiv,
+// siehe AUTO_SLEEP_TIMEOUT_MS in Config.h.
+#define MASSARBEIT_HAS_WAKE_BUTTON 1
 
 // Spannungsteiler vor dem Batterie-ADC (Faktor 2), siehe LilyGOs
 // GetBatteryVoltage-Beispiel.

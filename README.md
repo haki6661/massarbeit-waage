@@ -207,6 +207,23 @@ starten.
 - **Doppelklick**: Kalibrierroutine starten
 - **drücken, während sie schläft**: aufwecken
 
+#### Der aktuell gebaute Aufbau der Basis
+
+Kein Taster, kein Schalt-MOSFET, keine Deep-Sleep-Automatik:
+
+| | |
+|---|---|
+| Ein/Aus | Schiebeschalter des Boards (bzw. extern parallel dazu) |
+| LEDs | 8er-Leiste, `DIN` an GPIO4, `5V`/`GND` an den Header |
+| Auto-Sleep | aus (`MASSARBEIT_HAS_WAKE_BUTTON 0` im Board-Profil) |
+| Tara / Kalibrierung | über die App (BLE `0x01` bzw. `0x20`/`0x21`) |
+
+Weil das Gerät nicht mehr von selbst einschläft, übernimmt die Leiste die
+Aufgabe zu zeigen, **dass die Waage überhaupt an ist**: im Leerlauf atmet sie
+langsam im Akzentton und geht dabei nie ganz aus. Ohne dieses Signal wäre von
+außen nicht zu erkennen, ob jemand vergessen hat einzuschalten - oder
+auszuschalten, was den Akku kostet.
+
 #### Einfachste Variante: ganz ohne Taster
 
 Der Taster ist auf der Basis optional. Das Board hat bereits einen
@@ -306,14 +323,22 @@ Serial-Log, das auf der Basis den Bildschirm ersetzt.
 | nah dran (`0x12`) | zwei lange Blitze |
 | daneben (`0x12`) | ein langer, gedimmter Blitz |
 
-### LED-Ring nachrüsten (WS2812B, 5V RGB - vorbereitet, noch nicht bestückt)
+### WS2812B-Lichtleiste / -ring
 
-Die Firmware bringt die komplette Lichtlogik für einen adressierbaren
-WS2812B-Ring im Deckel schon mit (`src/LedRing.h/.cpp`), **aktiviert ist sie
-in keiner der beiden Varianten**. Ohne Freigabe im Board-Profil wirft der
-Compiler den gesamten Ring-Code als toten Code weg - das ausgeschaltete
-Binary wächst dadurch praktisch nicht, die Logik wird aber bei jedem Build
-mitkompiliert und kann nicht unbemerkt verrotten.
+Die Lichtlogik steht in `src/LedRing.h/.cpp` und ist **auf der Basis aktiv**
+(erste Ausbaustufe: gerade 8er-Leiste am Werkbankaufbau), **auf der Vision
+noch aus**. Ohne Freigabe im Board-Profil wirft der Compiler den gesamten
+Ring-Code als toten Code weg - das ausgeschaltete Binary wächst dadurch
+praktisch nicht, die Logik wird aber bei jedem Build mitkompiliert und kann
+nicht unbemerkt verrotten.
+
+**Ring oder Leiste?** `MASSARBEIT_LED_RING_IS_STRIP` im Board-Profil
+entscheidet, wie sich bewegte Muster verhalten: auf dem Ring laufen sie
+rundum weiter, auf einer geraden Leiste pendeln sie hin und her. Ein Punkt,
+der am Ende der Leiste verschwindet und vorne wieder auftaucht, sieht dort
+nach Fehler aus, nicht nach Animation. Schweiflängen und die Plätze der fünf
+Startampel-Lampen richten sich außerdem nach `MASSARBEIT_LED_RING_COUNT` -
+auf acht LEDs würde ein fester Fünf-Pixel-Schweif einfach alles ausleuchten.
 
 Der Ring **ersetzt keine der bestehenden Anzeigen**, er läuft parallel mit:
 auf der Vision zusätzlich zum TFT, auf der Basis zusätzlich zur einfarbigen
@@ -321,16 +346,19 @@ Status-LED. Am BLE-Protokoll ändert sich kein Byte - `TftDisplay` und
 `LedStatusUi` reichen dieselben Cue-/Spielerwechsel einfach an den Ring
 weiter, die App merkt nichts davon.
 
-**Scharfschalten (drei Handgriffe):**
+**Scharfschalten einer weiteren Variante:**
 
-1. Ring anlöten (Verdrahtung siehe Tabelle unten): Datenleitung an
-   `Pins::LED_RING_DATA`, 5V-Zuleitung über einen High-Side-Schalter an
-   `Pins::LED_RING_POWER`. Begründung der Pinwahl steht im jeweiligen
-   Board-Profil.
-2. Im Board-Profil `MASSARBEIT_HAS_LED_RING` auf `1` setzen und
-   `MASSARBEIT_LED_RING_COUNT` auf die tatsächliche LED-Zahl (Vorgabe: 16).
-3. In `platformio.ini` die auskommentierte Zeile
-   `adafruit/Adafruit NeoPixel@^1.12.0` einkommentieren.
+1. LEDs anlöten (Verdrahtung siehe Tabelle unten): Datenleitung an
+   `Pins::LED_RING_DATA`; die 5V-Zuleitung entweder fest oder über einen
+   High-Side-Schalter an `Pins::LED_RING_POWER`
+   (`MASSARBEIT_LED_RING_HAS_POWER_SWITCH`). Begründung der Pinwahl steht im
+   jeweiligen Board-Profil.
+2. Im Board-Profil `MASSARBEIT_HAS_LED_RING` auf `1`,
+   `MASSARBEIT_LED_RING_COUNT` auf die tatsächliche LED-Zahl und
+   `MASSARBEIT_LED_RING_IS_STRIP` auf die Geometrie setzen.
+
+Die NeoPixel-Abhängigkeit steht bereits in `platformio.ini`; sie wird nur
+dann wirklich eingebunden, wenn ein Board-Profil den Ring freigibt.
 
 | Ring | Basis (T-OI Plus) | Vision (T-Display S3) |
 |---|---|---|

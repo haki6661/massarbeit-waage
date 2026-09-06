@@ -54,6 +54,18 @@ public:
     static constexpr bool ENABLED = (MASSARBEIT_HAS_LED_RING != 0);
     static constexpr uint16_t COUNT = MASSARBEIT_LED_RING_COUNT;
 
+    // Gerade Leiste statt geschlossenem Ring (Board-Profil). Aendert das
+    // Verhalten jeder Bewegung: auf dem Ring laeuft ein Punkt im Kreis, auf
+    // der Leiste pendelt er hin und her. Ein Punkt, der am Ende der Leiste
+    // verschwindet und vorne wieder auftaucht, sieht nach Fehler aus, nicht
+    // nach Animation.
+    static constexpr bool IS_STRIP = (MASSARBEIT_LED_RING_IS_STRIP != 0);
+
+    // Schweiflaenge bewegter Muster, an die LED-Zahl gekoppelt: auf einer
+    // 8er-Leiste wuerde ein fester 5-Pixel-Schweif praktisch alles ausleuchten
+    // und die Bewegung unsichtbar machen.
+    static constexpr uint8_t TAIL = (COUNT >= 16) ? 4 : (COUNT >= 10 ? 3 : 2);
+
     // Einmalig in setup(). Faerbt den Ring nicht ein, sondern loescht ihn nur -
     // die Bootanimation gehoert der jeweiligen Hauptanzeige (Sprite bzw.
     // atmende Status-LED), der Ring steigt erst mit der ersten update()
@@ -117,6 +129,7 @@ private:
     // den vorherigen Inhalt - so kann die Reihenfolge in renderFrame() ohne
     // Nebenwirkungen umsortiert werden.
     void renderRaceLights(uint32_t now);
+    void drawRaceLamp(uint8_t lamp);
     void renderHx711Error(uint32_t now);
     void renderCue(uint32_t now, RemoteCue cue);
     void renderAway(uint32_t now, GameKind game);
@@ -143,6 +156,12 @@ private:
     // 0..1 -> weicher Auf-/Abblendverlauf ohne Knick an den Umkehrpunkten
     // (dasselbe Kosinus-Fenster wie LedStatusUi::applySignal()).
     static float breathe(uint32_t elapsedMs, uint16_t periodMs);
+
+    // Laufposition eines bewegten Punktes, ein kompletter Durchlauf je
+    // `periodMs`. Ring: laeuft rundum weiter. Leiste: pendelt in derselben
+    // Zeit einmal hin und zurueck. Bewusst zeit- statt pixelbasiert, damit
+    // dieselbe Animation auf 8 und auf 24 LEDs gleich schnell wirkt.
+    float travel(uint32_t elapsedMs, uint32_t periodMs) const;
     static Rgb scaled(Rgb color, float factor);
     static Rgb fromColor565(uint16_t color565);
     static Rgb gameColor(GameKind game);
