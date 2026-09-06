@@ -86,13 +86,18 @@ public:
     // --- Startampel (Formel 1) --------------------------------------------
     // Fuenf rote Lampen gehen nacheinander an, bleiben `holdMs` stehen und
     // erloeschen dann gemeinsam ("lights out") - genau die Ampel, die die
-    // App fuer das Zeitspiel "Formel 1" auf dem Bildschirm zeigt, nur rundum
-    // sichtbar. Wer den Gruen-Zeitpunkt bestimmt, ist bewusst offen gelassen:
-    //   - App entscheidet:  startRaceLights(0) und spaeter raceLightsGreen()
-    //   - Waage entscheidet: startRaceLights(<ausgeloste Haltezeit>)
-    // Beides ist hier moeglich, ohne dass sich der Rest aendert (siehe
-    // ROADMAP.md, "Formel 1 auf dem Geraet nachziehen" - dort haengt noch
-    // die Protokollhaelfte, die diese Methoden von der App aus ausloest).
+    // App fuer das Zeitspiel "Formel 1" auf dem Bildschirm zeigt, nur an der
+    // Waage selbst.
+    //
+    // Ausgeloest wird das per BLE (0x30/0x31/0x32, siehe Config.h) aus der
+    // App. Wer den Gruen-Zeitpunkt bestimmt, bleibt dabei offen und wird vom
+    // Kommando entschieden:
+    //   - Waage entscheidet: startRaceLights(<ausgeloste Haltezeit>) - sie
+    //     zaehlt selbst herunter und geht ohne weiteres Kommando auf Gruen.
+    //   - App entscheidet:   startRaceLights(0), spaeter raceLightsGreen().
+    // Heute schickt die App die ausgeloste Haltezeit mit (erster Fall).
+    // Auf dem TFT der Vision fehlt die Ampel noch (siehe ROADMAP.md,
+    // "Formel 1 auf der Vision (TFT) nachziehen").
     void startRaceLights(uint32_t holdMs = 0);
     void raceLightsGreen();
     // Fehlstart/Abbruch: kurzes rotes Warnblinken, danach zurueck in den

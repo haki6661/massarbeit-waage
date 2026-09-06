@@ -1,9 +1,10 @@
 #pragma once
 
-// Minimale TFT-Textausgabe fuer den T-Display S3. Bewusst ohne Animationen -
-// die kommen laut Vorgabe erst spaeter. Ersetzt WeighMyBru2s
-// Display.h/.cpp (Adafruit_SSD1306 an I2C) komplett, weil der T-Display S3
-// sein ST7789-Display ueber einen 8-Bit-Parallelbus ansteuert, nicht I2C.
+// TFT-Anzeige des T-Display S3: Spielauswahl, Spieler-Badge, spiel-
+// spezifische Away-Animationen und die Sprite-Bootanimation aus SPIFFS.
+// Ersetzt WeighMyBru2s Display.h/.cpp (Adafruit_SSD1306 an I2C) komplett,
+// weil der T-Display S3 sein ST7789-Display ueber einen 8-Bit-Parallelbus
+// ansteuert, nicht I2C.
 //
 // Bus-/Panel-Konstruktion 1:1 aus LilyGOs eigenem Beispiel uebernommen
 // (Xinyuan-LilyGO/T-Display-S3, examples/Arduino_GFXDemo) - nicht geraten.

@@ -20,10 +20,11 @@
 #define MASSARBEIT_HAS_TFT         1
 #define MASSARBEIT_HAS_STATUS_LED  0
 #define MASSARBEIT_STATUS_LED_RGB  0
-// WS2812B-Lichtring im Deckel: vorbereitet, aber AUS (identisch zur Basis,
-// siehe t_oi_plus.h und src/LedRing.h). Auf der Vision kaeme er ZUSAETZLICH
-// zum TFT - das Display bleibt unveraendert, der Ring traegt dieselben
-// Zustaende nur rundum sichtbar nach aussen.
+// WS2812B-Lichtring im Deckel: vorbereitet, aber hier noch AUS - bestueckt
+// ist bisher nur die Basis (dort eine gerade 8er-Leiste, siehe t_oi_plus.h
+// und src/LedRing.h). Auf der Vision kaeme der Ring ZUSAETZLICH zum TFT -
+// das Display bleibt unveraendert, der Ring traegt dieselben Zustaende nur
+// rundum sichtbar nach aussen.
 #define MASSARBEIT_HAS_LED_RING    0
 #define MASSARBEIT_LED_RING_COUNT  16
 // Geschlossener Ring (0) statt gerader Leiste - auf der Vision ist der Ring
@@ -95,7 +96,7 @@ constexpr uint8_t BATTERY_ADC = 4;
 constexpr uint8_t HX711_DOUT = 1;
 constexpr uint8_t HX711_SCK  = 2;
 
-// --- WS2812B-Lichtring (vorbereitet, siehe MASSARBEIT_HAS_LED_RING) -------
+// --- WS2812B-Lichtring (noch nicht bestueckt, siehe MASSARBEIT_HAS_LED_RING) ---
 // GPIO13: laut offizieller Pin-Tabelle auf die Stiftleiste herausgefuehrt und
 // von Display-Bus, Backlight, POWER_ON, Tastern, Batterie-ADC und HX711
 // unbenutzt. Kein Strapping-Pin (das sind am S3 GPIO0/3/45/46).
