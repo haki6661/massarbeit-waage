@@ -137,14 +137,22 @@ constexpr uint8_t STATUS_LED = 3;
 //     ueber die 5V-Versorgung des Rings, sonst kann die erste LED sterben.
 //   - Strom: der Ring haengt an 5V, NICHT an der 16340-Zelle - das Board
 //     kann ihn nicht mitversorgen (siehe LED_RING_MAX_BRIGHTNESS).
-//   - ACHTUNG, WOHER KOMMEN DIE 5V? Der 5V-Pin dieses Boards ist USB-VBUS.
-//     Ohne Kabel liegt dort NICHTS an - im reinen Akkubetrieb hat ein
-//     WS2812B-Ring also gar keine Versorgung. Wer ihn mobil betreiben will,
-//     braucht einen Step-up 3.7V -> 5V. Dessen EN-Pin laesst sich direkt an
-//     LED_RING_POWER haengen (siehe unten), dann entfaellt der High-Side-
-//     Schalter komplett und der Wandler spart im Schlaf auch noch seinen
-//     eigenen Ruhestrom. Vor dem Aufbau am konkreten Board nachmessen, ob
-//     der 5V-Pin wirklich nur an VBUS haengt.
+//   - ACHTUNG, WOHER KOMMEN DIE 5V? Aus dem Akku jedenfalls nicht: das Board
+//     hat nur einen Abwaertspfad (LDO auf 3.3V) und einen Laderegler, keinen
+//     Step-up. Aus 3.7V Zellspannung werden ohne Aufwaertswandler keine 5V.
+//     Was am 5V-Pin dann anliegt, haengt an der Beschaltung und ist vor dem
+//     Aufbau nachzumessen (Akku dran, USB ab, gegen GND messen):
+//       a) nur USB-VBUS  -> ohne Kabel 0V, der Ring braucht mobil einen
+//          Step-up 3.7V -> 5V. Dessen EN-Pin kann direkt an LED_RING_POWER
+//          haengen, dann entfaellt der High-Side-Schalter komplett und der
+//          Wandler spart im Schlaf auch noch seinen eigenen Ruhestrom.
+//       b) die Rail vor dem LDO -> im Akkubetrieb liegt dort die
+//          Zellspannung (~3.7-4.2V). WS2812B laufen damit durchaus, nur
+//          etwas dunkler und im Farbton leicht waermer; unterhalb von ~3.5V
+//          werden sie unzuverlaessig. Nebeneffekt: das Pegelproblem
+//          verschwindet (die Datenleitung braucht ~0.7*VDD, bei 4.0V sind
+//          das 2.8V - die 3.3V des C3 liegen sauber darueber), ein
+//          Level-Shifter ist dann unnoetig.
 //   - RUHESTROM: jede WS2812B zieht ~0.6-1mA fuer ihren internen Controller,
 //     auch wenn sie schwarz ist. Bei 16 LEDs sind das ~10-16mA rund um die
 //     Uhr - das leert eine 700mAh-Zelle in unter zwei Tagen und macht den

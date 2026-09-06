@@ -315,12 +315,24 @@ weiter, die App merkt nichts davon.
 | 5V | über High-Side-Schalter, Gate an GPIO10 | über High-Side-Schalter, Gate an GPIO12 |
 | GND | GND (rechter Header) | GND |
 
-Woher die 5V kommen, ist vor dem Aufbau zu klären: der `5V`-Pin des T-OI
-Plus ist USB-VBUS, im reinen Akkubetrieb liegt dort nichts an. Ein mobil
-betriebener Ring braucht also einen Step-up 3,7V -> 5V - und dann hängt man
-`LED_RING_POWER` am besten direkt an dessen EN-Pin: der High-Side-Schalter
-entfällt komplett, und der Wandler spart im Schlaf zusätzlich seinen eigenen
-Ruhestrom. Die Strombilanz begrenzt dabei die sinnvolle Ringgröße: 32 LEDs
+Woher die 5V kommen, ist vor dem Aufbau zu klären. Aus dem Akku jedenfalls
+nicht: der T-OI Plus hat nur einen Abwärtspfad (LDO auf 3,3V) und einen
+Laderegler, keinen Step-up - aus 3,7V Zellspannung werden ohne
+Aufwärtswandler keine 5V. Was am `5V`-Pin anliegt, hängt an der Beschaltung
+und ist nachzumessen (Akku dran, USB ab, gegen GND):
+
+- **Nur USB-VBUS** → ohne Kabel 0V. Mobil braucht der Ring dann einen
+  Step-up 3,7V → 5V; dessen EN-Pin hängt man am besten direkt an
+  `LED_RING_POWER`, dann entfällt der High-Side-Schalter komplett und der
+  Wandler spart im Schlaf zusätzlich seinen eigenen Ruhestrom.
+- **Die Rail vor dem LDO** → im Akkubetrieb liegt dort die Zellspannung
+  (~3,7-4,2V). WS2812B laufen damit durchaus, nur etwas dunkler und im
+  Farbton leicht wärmer; unter ~3,5V werden sie unzuverlässig. Nebeneffekt:
+  das Pegelproblem verschwindet (die Datenleitung braucht ~0,7×VDD, bei 4,0V
+  also 2,8V - die 3,3V des ESP32 liegen sauber darüber), ein Level-Shifter
+  ist dann unnötig.
+
+Die Strombilanz begrenzt in beiden Fällen die sinnvolle Ringgröße: 32 LEDs
 ziehen bei Vollweiß ~1,9A, die ein Step-up sich mit ~2,7A aus der Zelle
 holt - das ist eher ein Netzteil-Aufbau als ein 16340-Aufbau.
 
