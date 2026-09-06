@@ -39,9 +39,9 @@
 // Modellerkennung. Die App liest die Characteristic einmal beim Verbinden und
 // stellt ihre Oberflaeche darauf ein (siehe DeviceInfo/WeightSource im
 // App-Repo). Inhalt, hier am Beispiel der Basis:
-//   {"model":"t-oi-plus","name":"Massarbeit","fw":"1.8.1",
+//   {"model":"t-oi-plus","name":"Massarbeit","fw":"1.10.0",
 //    "variant":"t-oi-plus",
-//    "caps":{"display":false,"battery":true,"buttons":1,"led":true,"ota":true}}
+//    "caps":{"display":false,"battery":true,"buttons":0,"led":true,"ota":true}}
 // JSON statt einer kompakten Byte-Bitmaske ist Absicht: es laesst sich um ein
 // Feld erweitern, ohne dass App und Firmware gleichzeitig aktualisiert werden
 // muessen. Auf der Firmware reicht dafuer ein snprintf, kein Parser.
@@ -49,7 +49,7 @@
 // Display" an - alte Geraete funktionieren unveraendert weiter.
 #define BLE_DEVICE_INFO_CHAR_UUID "6E40000A-B5A3-F393-E0A9-E50E24DCCA9E" // read, UTF-8-JSON
 
-// Kalibrierung per App statt (ausschliesslich) per Serial Monitor + Taster
+// Kalibrierung per App statt (ausschliesslich) ueber die Serial-Routine
 // (siehe CalibrationRoutine.h, weiterhin als Fallback ohne Handy vorhanden).
 // Rohwert-Characteristic: read+notify, int32 LE, HX711-Rohwert (Mittel aus 10
 // Messungen) - von der App nach COMMAND_CALIBRATION_GET_RAW gelesen, siehe
@@ -80,8 +80,9 @@
 //                       Indicator im App-Repo)
 //   0x12 <byte>         Display: Ergebnis-Guete des letzten Schlucks
 //                       (0 = daneben, 1 = nah dran, 2 = Volltreffer) -
-//                       Grundgeruest fuer spaeter geplante Animationen je
-//                       Guete-Stufe, aktuell nur Text/Farbe als Platzhalter.
+//                       Auf der LED-Leiste/dem Ring je Stufe ein eigenes
+//                       Muster (siehe LedRing::renderCue()); auf dem TFT
+//                       bislang nur Text/Farbe.
 //   0x13 <gameId>       Display: Glas komplett von der Waage gehoben
 //                       ("Abschlag") - laeuft als Endlos-Animation, bis
 //                       0x10/0x12 kommt. Welche Animation (Ball/Pfeil/Karte/
@@ -167,13 +168,13 @@
 #define DEV_OTA_PASSWORD  "massarbeit"     // beim Upload: --auth=massarbeit (bzw. angepasst)
 
 // ============================================================================
-// WS2812B-RGB-LED-Ring (vorbereitet, standardmaessig AUS)
+// WS2812B-Lichtleiste / -ring
 // ----------------------------------------------------------------------------
-// Zeit- und Helligkeitswerte des Lichtrings im Deckel (siehe src/LedRing.h).
-// Sie gelten erst, wenn `MASSARBEIT_HAS_LED_RING` im Board-Profil auf 1
-// steht - vorher wird der komplette Ring-Code vom Compiler als toter Code
-// verworfen. Hier stehen sie trotzdem schon, weil das die Werte sind, an
-// denen man beim ersten Aufbau tatsaechlich dreht.
+// Zeit- und Helligkeitswerte der LED-Anzeige (siehe src/LedRing.h). Sie
+// gelten je Variante nur, wenn `MASSARBEIT_HAS_LED_RING` im Board-Profil auf
+// 1 steht - sonst wird der komplette Ring-Code vom Compiler als toter Code
+// verworfen. Aktiv ist das derzeit auf der Basis (8er-Leiste), auf der
+// Vision noch nicht.
 // ============================================================================
 
 // Harte Helligkeitsobergrenze (0-255), angewandt in LedRing::show(). WS2812B

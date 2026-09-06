@@ -2,15 +2,16 @@
 
 // Interaktive Kalibrierung, angelehnt an WeighMyBru2s Web-API-Endpunkt
 // "/api/calibrate" (Faktor = Rohwert / bekanntes Gewicht), nur eben ueber
-// Serial+Taster+Geraeteanzeige statt eines Webformulars.
+// Serial + Geraeteanzeige statt eines Webformulars. Gestartet wird sie mit
+// 'cal' im Serial Monitor, auf der Vision zusaetzlich per Tastendruck.
 //
 // Bewusst BLOCKIEREND: Kalibrieren ist ein seltener, bewusster Wartungs-
 // schritt, bei dem sowieso jemand direkt am Geraet mit offenem Serial
 // Monitor steht - auf der Basis ist Serial ohnehin der einzige Kanal, sie hat
 // kein Display, auf dem die Aufforderungen stehen koennten (siehe
-// LedStatusUi::showMessage()). Waehrend run() laufen BLE/Anzeige/Taster-
-// Polling der Hauptschleife nicht weiter - das ist hier in Ordnung und
-// deutlich einfacher als eine nebenlaeufige State Machine.
+// LedStatusUi::showMessage()). Waehrend run() laeuft die Hauptschleife nicht
+// weiter, also weder BLE- noch Anzeige- oder Tasten-Polling - das ist hier in
+// Ordnung und deutlich einfacher als eine nebenlaeufige State Machine.
 //
 // Seit COMMAND_CALIBRATION_GET_RAW/-SET_FACTOR (siehe BleWeightService.h,
 // Config.h) kann dieselbe Kalibrierung auch direkt aus der App per BLE

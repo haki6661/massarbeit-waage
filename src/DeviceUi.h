@@ -14,7 +14,9 @@
 //   begin(), update(hx711Ok, bleOk), showMessage(title, body),
 //   runBootSequence(stepInit), setRemoteCue(cue, game),
 //   setActivePlayer(game, color565, name), clearActivePlayer(),
-//   pickerNext(), pickerConfirm(), prepareForSleep(), color565FromRgb(r, g, b)
+//   startRaceLights(holdMs), raceLightsGreen(), abortRaceLights(),
+//   pickerNext(), pickerConfirm(), prepareForSleep(),
+//   color565FromRgb(r, g, b), attachLedRing(ring)
 
 #include "BoardConfig.h"
 #include "DeviceUiTypes.h"
