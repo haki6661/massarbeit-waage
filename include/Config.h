@@ -164,7 +164,30 @@
 // ziehen bei Vollweiss bis zu ~60mA je LED - 16 LEDs waeren fast 1A und
 // wuerden die 16340-Zelle der Basis in kurzer Zeit leeren. 40/255 ist im
 // Partylicht immer noch deutlich sichtbar, kostet aber nur einen Bruchteil.
-// Vor dem Hochdrehen die Stromversorgung pruefen, nicht nur das Aussehen.
+//
+// Dieser Wert ist zugleich das Strombudget des ganzen Aufbaus - vor dem
+// Hochdrehen also die Stromversorgung pruefen, nicht nur das Aussehen.
+// Worst Case je LED (alle drei Farben voll = Weiss): 60mA * B/255, dazu
+// ~1mA Ruhestrom des LED-Controllers:
+//
+//   B=40 (hier)  ~10.4mA je LED     B=128  ~31mA je LED
+//   B=64         ~16mA je LED       B=255  ~61mA je LED
+//
+// Haengt der Ring am "5V"-Pin der Basis, laeuft sein Strom durch den
+// Schiebeschalter SW2 des Boards - LilyGO gibt dafuer keine Belastbarkeit
+// an, die Bauform ist typisch mit 0.3A spezifiziert, und der ESP32 selbst
+// braucht davon schon 40-80mA. Fuer die LEDs bleiben also ~150-200mA:
+//
+//   bei B=40   ~16 LEDs bequem, ~20 als Obergrenze
+//   bei B=64   ~12 LEDs
+//   bei B=128  ~6 LEDs
+//
+// Mehr LEDs (z.B. ein 32er-Ring) NICHT ueber den 5V-Pin speisen, sondern
+// direkt an der Zelle abgreifen - der Ring haengt ohnehin am
+// GPIO-geschalteten MOSFET (Pins::LED_RING_POWER) und wird im Schlaf
+// getrennt. Ein ueberlasteter Schiebeschalter stirbt nicht schlagartig,
+// seine Kontakte werden nur langsam hochohmig - das aeussert sich als
+// sporadische Resets, die man dann ewig woanders sucht.
 #define LED_RING_MAX_BRIGHTNESS 40
 
 // Bildrate des Rings. 20ms = 50 Bilder/s; jedes Bild sperrt waehrend der
@@ -199,7 +222,21 @@
 // siehe main.cpp); auf der Basis der einzige Taster (GPIO33, ebenfalls kein
 // Strapping-Pin).
 // ============================================================================
-#define AUTO_SLEEP_TIMEOUT_MS (10UL * 60UL * 1000UL) // 10 Minuten
+// Haengt am Aufweck-Taster: ohne einen waere ein eingeschlafenes Geraet bis
+// zum Aus- und Wiedereinschalten tot, deshalb schaltet 0 den Auto-Sleep dort
+// komplett ab. Welche Variante einen Taster hat, sagt das Board-Profil
+// (MASSARBEIT_HAS_WAKE_BUTTON) - so muss beim Bauen niemand daran denken.
+//
+// Vision: Taste 2 weckt auf, Auto-Sleep bleibt aktiv.
+// Basis: kein Taster verbaut, ein/aus macht der Schiebeschalter des Boards
+// (der trennt Zelle UND USB, siehe t_oi_plus.h - also wirklich stromlos statt
+// nur schlafend). Tara und Kalibrierung laufen dort ueber die App
+// (BLE 0x01 bzw. 0x20/0x21), am Geraet fehlt dadurch nichts Wesentliches.
+#if MASSARBEIT_HAS_WAKE_BUTTON
+    #define AUTO_SLEEP_TIMEOUT_MS (10UL * 60UL * 1000UL) // 10 Minuten
+#else
+    #define AUTO_SLEEP_TIMEOUT_MS 0 // aus - siehe oben
+#endif
 #define SLEEP_ACTIVITY_THRESHOLD_G 1.0f // Gewichtsaenderung, die den Inaktivitaets-Timer zuruecksetzt
 
 // ============================================================================

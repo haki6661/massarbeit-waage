@@ -55,6 +55,23 @@ bool Scale::begin() {
     return true;
 }
 
+void Scale::powerDown() {
+    // Bewusst direkt ueber den Takt-Pin statt ueber die Library: das ist
+    // exakt der im HX711-Datenblatt beschriebene Weg (PD_SCK laenger als
+    // 60µs HIGH halten -> Chip geht in den Power-Down) und haengt an keiner
+    // Library-Version. Der Pin ist seit hx711.begin() ohnehin OUTPUT.
+    //
+    // Erst LOW, dann HIGH: faengt den Fall ab, dass der Takt gerade mitten in
+    // einer Uebertragung schon HIGH steht - der Chip zaehlt die HIGH-Dauer ab
+    // der Flanke, ein bereits stehendes HIGH wuerde also nicht sicher als
+    // Power-Down-Kommando gelten.
+    digitalWrite(clockPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(clockPin, HIGH);
+    delayMicroseconds(80); // Datenblatt: >60µs
+    Serial.println("[Scale] HX711 in den Standby geschickt.");
+}
+
 void Scale::tare(uint8_t times) {
     if (!isConnected) {
         Serial.println("[Scale] Tare uebersprungen: HX711 nicht verbunden.");

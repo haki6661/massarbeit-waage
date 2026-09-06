@@ -207,6 +207,46 @@ starten.
 - **Doppelklick**: Kalibrierroutine starten
 - **drücken, während sie schläft**: aufwecken
 
+#### Der aktuell gebaute Aufbau der Basis
+
+Kein Taster, kein Schalt-MOSFET, keine Deep-Sleep-Automatik:
+
+| | |
+|---|---|
+| Ein/Aus | Schiebeschalter des Boards (bzw. extern parallel dazu) |
+| LEDs | 8er-Leiste, `DIN` an GPIO4, `5V`/`GND` an den Header |
+| Auto-Sleep | aus (`MASSARBEIT_HAS_WAKE_BUTTON 0` im Board-Profil) |
+| Tara / Kalibrierung | über die App (BLE `0x01` bzw. `0x20`/`0x21`) |
+
+Weil das Gerät nicht mehr von selbst einschläft, übernimmt die Leiste die
+Aufgabe zu zeigen, **dass die Waage überhaupt an ist**: im Leerlauf atmet sie
+langsam im Akzentton und geht dabei nie ganz aus. Ohne dieses Signal wäre von
+außen nicht zu erkennen, ob jemand vergessen hat einzuschalten - oder
+auszuschalten, was den Akku kostet.
+
+#### Einfachste Variante: ganz ohne Taster
+
+Der Taster ist auf der Basis optional. Das Board hat bereits einen
+**Schiebeschalter**, der die komplette System-Schiene trennt (Zelle *und*
+USB, siehe Schaltplan-Ausschnitt weiter unten) - aus heißt damit wirklich
+aus, nicht "schläft": kein Deep Sleep nötig, kein Ruhestrom, auch nicht der
+eines angeschlossenen LED-Rings. Tara und Kalibrierung laufen ohnehin über
+die App (BLE `0x01` bzw. `0x20`/`0x21`), am Gerät fehlt also nichts
+Wesentliches.
+
+Dafür muss nur der **Auto-Sleep abgeschaltet** werden: ohne Aufweck-Taster
+wäre die Waage nach 10 Minuten sonst bis zum Aus-/Einschalten tot. In
+`include/Config.h`:
+
+```c
+#define AUTO_SLEEP_TIMEOUT_MS 0   // 0 = aus, Gerät wird am Board-Schalter ausgeschaltet
+```
+
+Ein LED-Ring braucht in diesem Aufbau auch keinen Schalt-MOSFET mehr - der
+Schiebeschalter nimmt ihm den Strom mit weg. Das gilt allerdings nur, solange
+der Ring am `5V`-Pin hängt und damit innerhalb der Belastbarkeit dieses
+Schalters bleibt (siehe `LED_RING_MAX_BRIGHTNESS`).
+
 Eine Geräte-Spielauswahl gibt es auf der Basis nicht - ohne Display ist
 nichts auszuwählen. Dev-OTA per WLAN entfällt ebenfalls (die Aktivierung
 hing am zweiten Taster); Firmware-Updates laufen per BLE aus der App.
@@ -216,6 +256,53 @@ hing am zweiten Taster); Firmware-Updates laufen per BLE aus der App.
 Automatischer Deep Sleep nach 10 Minuten ohne Gewichtsänderung und ohne
 Tastendruck (`AUTO_SLEEP_TIMEOUT_MS` in `include/Config.h`) - außer während
 Dev-OTA aktiv ist.
+
+Aufgeweckt wird ausschließlich über einen **Taster** (Momentary gegen GND,
+interner Pullup) - kein rastender Schalter. Das Aufwachen läuft über den
+Pin-**Pegel** (`ext0` bzw. `esp_deep_sleep_enable_gpio_wakeup()`, beide auf
+LOW), und derselbe Pin hängt im Betrieb an `Buttons`/OneButton. Ein Schalter,
+der in Stellung "ein" stehen bleibt, hielte den Pin dauerhaft LOW: die
+Firmware läse das als ewig gehaltene Taste, würde nach 2s den Langdruck
+auslösen, sofort einschlafen - und beim immer noch LOW liegenden Pin sofort
+wieder aufwachen. Ein Schalter gehört, wenn überhaupt, in die
+**Batterieleitung** (echte Trennung für Lagerung; der T-OI Plus hat so einen
+bereits an Bord, der T-Display S3 nicht).
+
+### Wie lange hält der Akku?
+
+Im Deep Sleep zieht der ESP32 selbst nur wenige µA - die Laufzeit entscheidet
+sich an allem anderen. Größter Einzelposten war der HX711: er läuft mit
+~1,4-1,6mA unbeeindruckt weiter, wenn man ihn nicht ausdrücklich schlafen
+legt. `enterDeepSleep()` ruft dafür `Scale::powerDown()` auf (Standby laut
+Datenblatt, ~0,3µA) und friert `HX711_SCK` über den Schlaf hinweg auf HIGH
+ein, damit der Standby auch hält. Auf der Basis (C3) geht dieses Einfrieren
+nicht - `HX711_SCK` ist dort GPIO7 und nicht RTC-fähig; wer die volle
+Standby-Zeit braucht, ergänzt einen ~10k-Pullup nach 3V3 (siehe
+`t_oi_plus.h`).
+
+Grobe Größenordnung für eine 700mAh-Zelle (davon real ~600mAh nutzbar):
+
+| Ruhestrom | Laufzeit |
+|---|---|
+| ~10 µA (nur der Chip, theoretisch) | Jahre - wird nie erreicht |
+| ~50-250 µA (Board-Overhead: LDO, Laderegler, Batterie-Spannungsteiler) | **~100 Tage bis ~1,4 Jahre** |
+| ~1,7 mA (HX711 bliebe versorgt - so war es vor `powerDown()`) | ~2 Wochen |
+
+Alles Datenblatt- und Erfahrungswerte, keine Messung an einem konkreten
+Aufbau - der Board-Overhead schwankt je nach Revision deutlich und ist die
+eine Zahl, die man wirklich nachmessen muss. Ab etwa einem halben Jahr
+begrenzt ohnehin die Selbstentladung der Zelle (2-5%/Monat).
+
+**Wichtig für den LED-Ring:** WS2812B ziehen ~0,6-1mA je LED für ihren
+internen Controller, **auch wenn sie dunkel sind** - 16 LEDs sind ~10-16mA
+rund um die Uhr und leeren dieselbe Zelle in unter zwei Tagen.
+Dunkelschalten allein hilft dagegen nicht. Der Ring wird deshalb über
+`Pins::LED_RING_POWER` (Basis GPIO10, Vision GPIO12) komplett stromlos
+geschaltet - dafür braucht er einen High-Side-Schalter in seiner
+5V-Zuleitung (P-MOSFET mit Gate-Pullup nach 5V + kleiner N-MOSFET als
+Pegelwandler, oder ein fertiger Load-Switch). Die Polarität ist bewusst so
+herum, dass ein hochohmiger GPIO - Deep Sleep, Boot, Reset - den Ring
+ausschaltet.
 
 ### Was die Status-LED der Basis sagt
 
@@ -236,14 +323,22 @@ Serial-Log, das auf der Basis den Bildschirm ersetzt.
 | nah dran (`0x12`) | zwei lange Blitze |
 | daneben (`0x12`) | ein langer, gedimmter Blitz |
 
-### LED-Ring nachrüsten (WS2812B, 5V RGB - vorbereitet, noch nicht bestückt)
+### WS2812B-Lichtleiste / -ring
 
-Die Firmware bringt die komplette Lichtlogik für einen adressierbaren
-WS2812B-Ring im Deckel schon mit (`src/LedRing.h/.cpp`), **aktiviert ist sie
-in keiner der beiden Varianten**. Ohne Freigabe im Board-Profil wirft der
-Compiler den gesamten Ring-Code als toten Code weg - das ausgeschaltete
-Binary wächst dadurch praktisch nicht, die Logik wird aber bei jedem Build
-mitkompiliert und kann nicht unbemerkt verrotten.
+Die Lichtlogik steht in `src/LedRing.h/.cpp` und ist **auf der Basis aktiv**
+(erste Ausbaustufe: gerade 8er-Leiste am Werkbankaufbau), **auf der Vision
+noch aus**. Ohne Freigabe im Board-Profil wirft der Compiler den gesamten
+Ring-Code als toten Code weg - das ausgeschaltete Binary wächst dadurch
+praktisch nicht, die Logik wird aber bei jedem Build mitkompiliert und kann
+nicht unbemerkt verrotten.
+
+**Ring oder Leiste?** `MASSARBEIT_LED_RING_IS_STRIP` im Board-Profil
+entscheidet, wie sich bewegte Muster verhalten: auf dem Ring laufen sie
+rundum weiter, auf einer geraden Leiste pendeln sie hin und her. Ein Punkt,
+der am Ende der Leiste verschwindet und vorne wieder auftaucht, sieht dort
+nach Fehler aus, nicht nach Animation. Schweiflängen und die Plätze der fünf
+Startampel-Lampen richten sich außerdem nach `MASSARBEIT_LED_RING_COUNT` -
+auf acht LEDs würde ein fester Fünf-Pixel-Schweif einfach alles ausleuchten.
 
 Der Ring **ersetzt keine der bestehenden Anzeigen**, er läuft parallel mit:
 auf der Vision zusätzlich zum TFT, auf der Basis zusätzlich zur einfarbigen
@@ -251,14 +346,90 @@ Status-LED. Am BLE-Protokoll ändert sich kein Byte - `TftDisplay` und
 `LedStatusUi` reichen dieselben Cue-/Spielerwechsel einfach an den Ring
 weiter, die App merkt nichts davon.
 
-**Scharfschalten (drei Handgriffe):**
+**Scharfschalten einer weiteren Variante:**
 
-1. Ring anlöten, Datenleitung an `Pins::LED_RING_DATA` - Vision GPIO13,
-   Basis GPIO4 (Begründung der Pinwahl steht im jeweiligen Board-Profil).
-2. Im Board-Profil `MASSARBEIT_HAS_LED_RING` auf `1` setzen und
-   `MASSARBEIT_LED_RING_COUNT` auf die tatsächliche LED-Zahl (Vorgabe: 16).
-3. In `platformio.ini` die auskommentierte Zeile
-   `adafruit/Adafruit NeoPixel@^1.12.0` einkommentieren.
+1. LEDs anlöten (Verdrahtung siehe Tabelle unten): Datenleitung an
+   `Pins::LED_RING_DATA`; die 5V-Zuleitung entweder fest oder über einen
+   High-Side-Schalter an `Pins::LED_RING_POWER`
+   (`MASSARBEIT_LED_RING_HAS_POWER_SWITCH`). Begründung der Pinwahl steht im
+   jeweiligen Board-Profil.
+2. Im Board-Profil `MASSARBEIT_HAS_LED_RING` auf `1`,
+   `MASSARBEIT_LED_RING_COUNT` auf die tatsächliche LED-Zahl und
+   `MASSARBEIT_LED_RING_IS_STRIP` auf die Geometrie setzen.
+
+Die NeoPixel-Abhängigkeit steht bereits in `platformio.ini`; sie wird nur
+dann wirklich eingebunden, wenn ein Board-Profil den Ring freigibt.
+
+| Ring | Basis (T-OI Plus) | Vision (T-Display S3) |
+|---|---|---|
+| DIN (Daten) | GPIO4, über 300-500Ω | GPIO13, über 300-500Ω |
+| 5V | über High-Side-Schalter, Gate an GPIO10 | über High-Side-Schalter, Gate an GPIO12 |
+| GND | GND (rechter Header) | GND |
+
+Woher die 5V kommen: der Pin heißt zwar `5V`, führt aber die System-Schiene
+des Boards, nicht konstante 5V. Laut offiziellem Schaltplan
+(`schematic/T-OI_PLUS_Schematic.pdf` im LilyGO-Repo) laufen beide Quellen auf
+denselben Knoten und von dort über den Power-Schalter auf den Header-Pin:
+
+```
+VBUS --[D13 BAT20J Schottky]--+
+                              +--[SW2 Power-Schalter]--> "5V"-Header-Pin
+VBAT --[Q2 Si2307 P-MOSFET]---+                     \--> ME6211 LDO --> 3V3
+```
+
+Also ~4,7V am USB (VBUS minus Schottky) und ~3,7-4,2V im Akkubetrieb
+(Zellspannung, direkt durchgeschaltet). Einen Step-up hat das Board nicht.
+Für den Ring heißt das:
+
+- **Am USB** läuft er normal.
+- **Am Akku** läuft er dunkler und im Farbton leicht wärmer, unter ~3,5V
+  Zellspannung wird er unzuverlässig. Nebeneffekt: das Pegelproblem
+  verschwindet (die Datenleitung braucht ~0,7×VDD, bei 4,0V also 2,8V - die
+  3,3V des ESP32 liegen sauber darüber), ein Level-Shifter ist unnötig.
+- **Große Ringe nicht über diesen Pin speisen:** der Strom liefe sonst durch
+  den kleinen Schiebeschalter SW2 auf dem Board, der dafür nicht ausgelegt
+  ist. Ab etwa einem halben Ampere direkt an der Zelle abgreifen oder extern
+  speisen. 32 LEDs ziehen bei Vollweiß ~1,9A - das ist ohnehin eher ein
+  Netzteil-Aufbau als ein 16340-Aufbau.
+
+Misst man am `5V`-Pin deutlich unter 3,5V, ist nicht der Pin schuld, sondern
+die Zelle: entweder fast leer, oder es steckt eine **CR123A-Primärzelle** im
+Halter. Die hat dieselbe Baugröße wie eine 16340, liefert aber nur ~3V und
+ist **nicht ladbar** - der TP4054 an Bord würde es beim nächsten USB-Kabel
+trotzdem versuchen.
+
+Als High-Side-Schalter gibt es ein passendes Fertigmodul, das ohne ein
+einziges zusätzliches Bauteil auskommt: **Pololu #2810** ("Mini MOSFET Slide
+Switch with Reverse Voltage Protection, **LV**"). Zwei P-Kanal-MOSFETs,
+1,8-20V, ~6A, plus Verpolungsschutz - und der `ON`-Pin ist direkt für einen
+Mikrocontroller gedacht: über ~1V ein, LOW **oder nicht angeschlossen** aus.
+Genau unsere Polarität, der Ring ist im Deep Sleep und beim Boot also von
+selbst tot. Verdrahtung: `VIN` an die Quelle, `VOUT` an Ring-VCC, `GND` an
+GND, `ON` an `Pins::LED_RING_POWER`. Der Schiebeschalter auf dem Modul liegt
+parallel zum `ON`-Pin und bleibt in Stellung "aus", dann hat der GPIO allein
+das Sagen. Die **LV**-Variante nehmen, nicht SV - die will ≥4,5V und stiege
+im Akkubetrieb aus. Nicht verifiziert: der Ruhestrom des Moduls im
+ausgeschalteten Zustand (Pololu gibt ihn nicht an) - vor der
+Standby-Rechnung nachmessen.
+
+Von den billigen "MOSFET Trigger Switch"-Modulen (IRF520, D4184) ist
+abzuraten: fast alle sind Low-Side, nehmen dem Ring also den Massebezug für
+die Datenleitung, und der IRF520 ist kein Logic-Level-Typ.
+
+Diskret aufgebaut statt fertig: P-MOSFET (AO3401, DMG3415, IRLML6402 o.ä.) mit
+100k-Gate-Pullup nach 5V, dessen Gate ein kleiner N-MOSFET (BSS138, 2N7002,
+BS170) gegen GND zieht, sobald der GPIO HIGH wird. Der N-MOSFET schaltet nur
+die ~50µA durch den Pullup, seine Ansteuerung ist also unkritisch - der
+P-MOSFET trägt den ganzen Ringstrom. Ein N-MOSFET allein reicht **nicht**:
+high-side kann er von 3,3V aus gar nicht schalten, und low-side (in der
+GND-Leitung) hebt er den Ring-GND gegen den Board-GND an, was die
+Datenleitung ihren Bezug kostet. Typen wie der BS170 sind zudem trotz
+TO-92-Bequemlichkeit keine Logic-Level-Typen (V_GS(th) bis 3,0V, R_DS(on)
+erst bei V_GS=10V spezifiziert) - bei 3,3V Gate-Spannung schalten sie je
+nach Exemplar nur teilweise durch. In dieser Schaltung stört das nicht: der
+kleine N-MOSFET zieht das Gate des P-MOSFET auf volle -5V V_GS, ein bei
+-4,5V spezifizierter P-Typ reicht also. Auslegen auf den Worst Case, nicht
+auf `LED_RING_MAX_BRIGHTNESS`: 16 LEDs sind bei Vollweiß ~1A, 32 LEDs ~1,9A.
 
 **Vor dem Festlöten prüfen:** ESP32-GPIOs geben 3,3V aus, WS2812B sind für
 5V-Logik spezifiziert (kurze Leitungen laufen meist trotzdem, sicher ist ein

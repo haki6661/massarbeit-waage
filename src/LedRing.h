@@ -1,34 +1,30 @@
 #pragma once
 
-// WS2812B-RGB-LED-Ring (5V, adressierbar) im Deckel - VORBEREITET, aber in
-// beiden Geraetevarianten standardmaessig AUSGESCHALTET.
-// Siehe ROADMAP.md, "WS2812B-RGB-LED-Ring im Deckel fuer visuelle Cues".
+// WS2812B-Lichtleiste bzw. -ring (5V, adressierbar).
+// Siehe ROADMAP.md, "WS2812B-RGB-LED-Ring im Deckel bestuecken und
+// scharfschalten".
 //
 // ---------------------------------------------------------------------------
-// Was hier schon fertig ist und was noch fehlt
+// Wo das gerade laeuft
 // ---------------------------------------------------------------------------
-// Fertig: die komplette Lichtlogik - Zustandsauswahl, Prioritaeten, alle
-// Muster (Ampel/Formel 1, Away je Spiel, Ergebnis-Gueten, Wiege-Balken,
-// Spielerfarbe, Verbindungszustand), Helligkeitsdeckel und Gamma.
-// Fehlt zum Scharfschalten (drei Handgriffe, siehe README, Abschnitt
-// "LED-Ring nachruesten"):
-//   1. Ring anloeten, Datenleitung an Pins::LED_RING_DATA (Board-Profil).
-//   2. `MASSARBEIT_HAS_LED_RING` im Board-Profil auf 1 und
-//      `MASSARBEIT_LED_RING_COUNT` auf die tatsaechliche LED-Zahl setzen.
-//   3. In platformio.ini die auskommentierte NeoPixel-Abhaengigkeit
-//      aktivieren.
+// Basis  (t_oi_plus.h):    AKTIV - gerade 8er-Leiste, direkt an 5V/GND.
+// Vision (t_display_s3.h): noch AUS - dort ist ein Ring im Deckel geplant.
+//
+// Freigegeben wird das je Board-Profil ueber MASSARBEIT_HAS_LED_RING; dazu
+// gehoeren MASSARBEIT_LED_RING_COUNT (LED-Zahl), _IS_STRIP (Geometrie) und
+// _HAS_POWER_SWITCH (Schalt-MOSFET in der 5V-Zuleitung, siehe README).
 //
 // ---------------------------------------------------------------------------
-// Warum das Modul trotzdem immer mitkompiliert wird
+// Warum das Modul auch ausgeschaltet mitkompiliert wird
 // ---------------------------------------------------------------------------
 // `ENABLED` ist ein `static constexpr bool` aus dem Board-Profil, kein
 // #if um die halbe Datei. Jede oeffentliche Methode steigt als Erstes ueber
 // `if (!ENABLED) return;` aus - der Compiler wirft den gesamten Rumpf danach
 // als toten Code weg, das ausgeschaltete Binary waechst also praktisch nicht.
 // Gleichzeitig wird die Lichtlogik bei JEDEM Build durchkompiliert und kann
-// nicht unbemerkt verrotten, waehrend sie in der Schublade liegt. Nur der
-// Zugriff auf die NeoPixel-Bibliothek selbst haengt an einem echten #if -
-// die Abhaengigkeit existiert im ausgeschalteten Build ja gar nicht.
+// in der Variante, die sie gerade nicht nutzt, nicht unbemerkt verrotten.
+// Nur der Zugriff auf die NeoPixel-Bibliothek selbst haengt an einem echten
+// #if - im ausgeschalteten Build soll sie gar nicht erst eingebunden werden.
 //
 // ---------------------------------------------------------------------------
 // Verhaeltnis zu TftDisplay/LedStatusUi
@@ -53,6 +49,18 @@ public:
     // dieser Klasse haengt daran und faellt sonst beim Kompilieren weg.
     static constexpr bool ENABLED = (MASSARBEIT_HAS_LED_RING != 0);
     static constexpr uint16_t COUNT = MASSARBEIT_LED_RING_COUNT;
+
+    // Gerade Leiste statt geschlossenem Ring (Board-Profil). Aendert das
+    // Verhalten jeder Bewegung: auf dem Ring laeuft ein Punkt im Kreis, auf
+    // der Leiste pendelt er hin und her. Ein Punkt, der am Ende der Leiste
+    // verschwindet und vorne wieder auftaucht, sieht nach Fehler aus, nicht
+    // nach Animation.
+    static constexpr bool IS_STRIP = (MASSARBEIT_LED_RING_IS_STRIP != 0);
+
+    // Schweiflaenge bewegter Muster, an die LED-Zahl gekoppelt: auf einer
+    // 8er-Leiste wuerde ein fester 5-Pixel-Schweif praktisch alles ausleuchten
+    // und die Bewegung unsichtbar machen.
+    static constexpr uint8_t TAIL = (COUNT >= 16) ? 4 : (COUNT >= 10 ? 3 : 2);
 
     // Einmalig in setup(). Faerbt den Ring nicht ein, sondern loescht ihn nur -
     // die Bootanimation gehoert der jeweiligen Hauptanzeige (Sprite bzw.
@@ -117,6 +125,7 @@ private:
     // den vorherigen Inhalt - so kann die Reihenfolge in renderFrame() ohne
     // Nebenwirkungen umsortiert werden.
     void renderRaceLights(uint32_t now);
+    void drawRaceLamp(uint8_t lamp);
     void renderHx711Error(uint32_t now);
     void renderCue(uint32_t now, RemoteCue cue);
     void renderAway(uint32_t now, GameKind game);
@@ -143,6 +152,12 @@ private:
     // 0..1 -> weicher Auf-/Abblendverlauf ohne Knick an den Umkehrpunkten
     // (dasselbe Kosinus-Fenster wie LedStatusUi::applySignal()).
     static float breathe(uint32_t elapsedMs, uint16_t periodMs);
+
+    // Laufposition eines bewegten Punktes, ein kompletter Durchlauf je
+    // `periodMs`. Ring: laeuft rundum weiter. Leiste: pendelt in derselben
+    // Zeit einmal hin und zurueck. Bewusst zeit- statt pixelbasiert, damit
+    // dieselbe Animation auf 8 und auf 24 LEDs gleich schnell wirkt.
+    float travel(uint32_t elapsedMs, uint32_t periodMs) const;
     static Rgb scaled(Rgb color, float factor);
     static Rgb fromColor565(uint16_t color565);
     static Rgb gameColor(GameKind game);
