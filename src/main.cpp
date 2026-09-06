@@ -301,7 +301,11 @@ void setup() {
     Serial.println("Taster: Tara (kurz) / Deep Sleep (2s halten) / Kalibrierung (Doppelklick)");
 #endif
     Serial.println("Serial: 'cal' + Enter startet die Kalibrierung (Werkbank-Ersatz fuer den Taster).");
+#if AUTO_SLEEP_TIMEOUT_MS > 0
     Serial.printf("[Power] Auto-Sleep nach %lu Minuten Inaktivitaet.\n", AUTO_SLEEP_TIMEOUT_MS / 60000UL);
+#else
+    Serial.println("[Power] Auto-Sleep deaktiviert - Geraet wird ueber den Board-Schalter ausgeschaltet.");
+#endif
 
     lastActivityMs = millis();
 }
@@ -331,10 +335,12 @@ void loop() {
         lastActivityWeight = weight;
         lastActivityMs = millis();
     }
+#if AUTO_SLEEP_TIMEOUT_MS > 0
     if (!devOtaActive && millis() - lastActivityMs > AUTO_SLEEP_TIMEOUT_MS) {
         Serial.println("[Power] Auto-Sleep: keine Aktivitaet seit 10 Minuten.");
         enterDeepSleep();
     }
+#endif
 
     if (calibrationRequested) {
         calibrationRequested = false;

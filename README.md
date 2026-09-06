@@ -207,6 +207,29 @@ starten.
 - **Doppelklick**: Kalibrierroutine starten
 - **drücken, während sie schläft**: aufwecken
 
+#### Einfachste Variante: ganz ohne Taster
+
+Der Taster ist auf der Basis optional. Das Board hat bereits einen
+**Schiebeschalter**, der die komplette System-Schiene trennt (Zelle *und*
+USB, siehe Schaltplan-Ausschnitt weiter unten) - aus heißt damit wirklich
+aus, nicht "schläft": kein Deep Sleep nötig, kein Ruhestrom, auch nicht der
+eines angeschlossenen LED-Rings. Tara und Kalibrierung laufen ohnehin über
+die App (BLE `0x01` bzw. `0x20`/`0x21`), am Gerät fehlt also nichts
+Wesentliches.
+
+Dafür muss nur der **Auto-Sleep abgeschaltet** werden: ohne Aufweck-Taster
+wäre die Waage nach 10 Minuten sonst bis zum Aus-/Einschalten tot. In
+`include/Config.h`:
+
+```c
+#define AUTO_SLEEP_TIMEOUT_MS 0   // 0 = aus, Gerät wird am Board-Schalter ausgeschaltet
+```
+
+Ein LED-Ring braucht in diesem Aufbau auch keinen Schalt-MOSFET mehr - der
+Schiebeschalter nimmt ihm den Strom mit weg. Das gilt allerdings nur, solange
+der Ring am `5V`-Pin hängt und damit innerhalb der Belastbarkeit dieses
+Schalters bleibt (siehe `LED_RING_MAX_BRIGHTNESS`).
+
 Eine Geräte-Spielauswahl gibt es auf der Basis nicht - ohne Display ist
 nichts auszuwählen. Dev-OTA per WLAN entfällt ebenfalls (die Aktivierung
 hing am zweiten Taster); Firmware-Updates laufen per BLE aus der App.

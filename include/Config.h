@@ -222,7 +222,15 @@
 // siehe main.cpp); auf der Basis der einzige Taster (GPIO33, ebenfalls kein
 // Strapping-Pin).
 // ============================================================================
-#define AUTO_SLEEP_TIMEOUT_MS (10UL * 60UL * 1000UL) // 10 Minuten
+// 0 schaltet den Auto-Sleep komplett ab. Gedacht fuer den einfachsten
+// moeglichen Aufbau der Basis: KEIN externer Taster, ein/aus macht allein
+// der Schiebeschalter des Boards (der trennt Zelle UND USB, siehe
+// t_oi_plus.h - also wirklich stromlos, nicht nur schlafend). Ohne
+// Aufweck-Taster waere ein eingeschlafenes Geraet sonst bis zum
+// Aus-/Einschalten tot, was mitten in einer Runde aergerlich ist.
+// Tara und Kalibrierung laufen in diesem Aufbau ueber die App
+// (BLE 0x01 bzw. 0x20/0x21), am Geraet fehlt dadurch nichts Wesentliches.
+#define AUTO_SLEEP_TIMEOUT_MS (10UL * 60UL * 1000UL) // 10 Minuten (0 = aus)
 #define SLEEP_ACTIVITY_THRESHOLD_G 1.0f // Gewichtsaenderung, die den Inaktivitaets-Timer zuruecksetzt
 
 // ============================================================================
