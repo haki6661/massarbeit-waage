@@ -63,10 +63,10 @@ public:
     void raceLightsGreen();
     void abortRaceLights();
 
-    // Ohne Display gibt es nichts auszuwaehlen - die Geraete-Spielauswahl
-    // entfaellt auf der Basis ersatzlos. Bewusst als leere Methoden erhalten,
-    // damit die Oberflaeche beider Varianten identisch bleibt (main.cpp ruft
-    // sie auf der Basis gar nicht erst auf, siehe MASSARBEIT_BUTTON_COUNT).
+    // Ohne Display UND ohne Taster gibt es auf der Basis nichts auszuwaehlen -
+    // die Geraete-Spielauswahl entfaellt dort ersatzlos. Bewusst als leere
+    // Methoden erhalten, damit die Oberflaeche beider Varianten identisch
+    // bleibt (main.cpp ruft sie ohne Taster gar nicht erst auf).
     void pickerNext() {}
     void pickerConfirm() {}
 

@@ -2,15 +2,27 @@
 LilyGO-Pinmap-Bild (t-oi-plus-official.png, in diesem Ordner).
 
 Pixelkoordinaten der Pads wurden durch Analyse des Original-Bilds ermittelt
-(Header-Pins "5"/"6"/"7"/"3V3" links, "GND" rechts). Bei einer neuen
+(Header-Pins "4"/"6"/"7"/"3V3" links, "GND"/"5V" rechts). Bei einer neuen
 Bild-Revision von LilyGO muessen sie neu bestimmt werden.
 
 Ausfuehren aus docs/pinout/src/:  python generate_basis.py
 """
 
+import os
+
 from PIL import Image, ImageDraw, ImageFont
 
-FONT_DIR = "C:/Windows/Fonts"
+# Windows-Schriften, wenn vorhanden - sonst DejaVu (Linux/CI). Nur die
+# Beschriftung sieht dann minimal anders aus, die Koordinaten bleiben gleich.
+def _font(bold, size):
+    candidates = [
+        f"C:/Windows/Fonts/{'arialbd' if bold else 'arial'}.ttf",
+        f"/usr/share/fonts/truetype/dejavu/DejaVuSans{'-Bold' if bold else ''}.ttf",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    return ImageFont.load_default()
 
 src = Image.open("t-oi-plus-official.png").convert("RGB")
 
@@ -30,17 +42,18 @@ pins = [
     ("1", (1308, 1778), "#dc2626"),  # 3V3 -> HX711 VCC
     ("2", (1308, 1413), "#d97706"),  # GPIO6 -> HX711 DOUT
     ("3", (1308, 1533), "#d97706"),  # GPIO7 -> HX711 SCK
-    ("4", (2342, 1652), "#1f2933"),  # GND (rechter Header) -> HX711 GND + Taster
-    ("5", (1308, 1291), "#2563eb"),  # GPIO5 -> Taster
+    ("4", (2342, 1652), "#1f2933"),  # GND (rechter Header) -> HX711 GND + LED GND
+    ("5", (1308, 1171), "#7c3aed"),  # GPIO4 -> WS2812B DIN
+    ("6", (2342, 1772), "#dc2626"),  # 5V (rechter Header) -> WS2812B 5V
 ]
 
 d = ImageDraw.Draw(crop)
-font_badge = ImageFont.truetype(f"{FONT_DIR}/arialbd.ttf", 24)
+font_badge = _font(True, 24)
 for num, pt, color in pins:
     cx, cy = tx(pt)
     r = 20
     d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=color, width=6)
-    right_side = num == "4"  # GND liegt am rechten Header -> Badge nach rechts
+    right_side = num in ("4", "6")  # rechter Header -> Badge nach rechts
     bx = cx + 60 if right_side else cx - 60
     by = cy
     br = 18
@@ -53,19 +66,19 @@ for num, pt, color in pins:
 
 # ---- Gesamtcanvas: Titel + Bild + Legende + Fussnote ----
 W = max(crop.width + 80, 760)
-title_h, legend_h, footer_h = 100, 240, 60
+title_h, legend_h, footer_h = 100, 285, 60
 H = title_h + crop.height + legend_h + footer_h
 
 canvas = Image.new("RGB", (W, H), "#ffffff")
 cd = ImageDraw.Draw(canvas)
-font_title = ImageFont.truetype(f"{FONT_DIR}/arialbd.ttf", 30)
-font_sub = ImageFont.truetype(f"{FONT_DIR}/arial.ttf", 18)
-font_legend_num = ImageFont.truetype(f"{FONT_DIR}/arialbd.ttf", 20)
-font_legend = ImageFont.truetype(f"{FONT_DIR}/arial.ttf", 20)
-font_footer = ImageFont.truetype(f"{FONT_DIR}/arial.ttf", 15)
+font_title = _font(True, 30)
+font_sub = _font(False, 18)
+font_legend_num = _font(True, 20)
+font_legend = _font(False, 20)
+font_footer = _font(False, 15)
 
-title = "Maßarbeit — HX711- & Taster-Anschluss"
-sub = "LilyGO T-OI Plus V1.3 · nur die tatsächlich verkabelten Header-Pins"
+title = "Maßarbeit — HX711- & LED-Anschluss"
+sub = "LilyGO T-OI Plus V1.3 · nur die tatsächlich verkabelten Header-Pins · kein Taster"
 tb = cd.textbbox((0, 0), title, font=font_title)
 cd.text(((W - (tb[2] - tb[0])) / 2, 24), title, font=font_title, fill="#1f2933")
 sb = cd.textbbox((0, 0), sub, font=font_sub)
@@ -79,8 +92,9 @@ legend = [
     ("1", "#dc2626", "3V3", "HX711 VCC (Plus)"),
     ("2", "#d97706", "GPIO 6", "HX711 DOUT (Daten)"),
     ("3", "#d97706", "GPIO 7", "HX711 SCK (Takt)"),
-    ("4", "#1f2933", "GND", "HX711 GND + Taster (gemeinsame Masse)"),
-    ("5", "#2563eb", "GPIO 5", "Taster (extern, gegen GND)"),
+    ("4", "#1f2933", "GND", "HX711 GND + LED-Leiste GND (gemeinsame Masse)"),
+    ("5", "#7c3aed", "GPIO 4", "WS2812B DIN (ueber 300-500 Ohm)"),
+    ("6", "#dc2626", "5V", "WS2812B 5V (Systemschiene, siehe README)"),
 ]
 ly = title_h + crop.height + 24
 for num, color, pinname, desc in legend:
