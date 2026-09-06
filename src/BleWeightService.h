@@ -54,6 +54,9 @@ private:
     static const uint8_t COMMAND_PLAYER_CLEAR = 0x15;
     static const uint8_t COMMAND_CALIBRATION_GET_RAW = 0x20;
     static const uint8_t COMMAND_CALIBRATION_SET_FACTOR = 0x21;
+    static const uint8_t COMMAND_RACE_LIGHTS_START = 0x30;
+    static const uint8_t COMMAND_RACE_LIGHTS_GREEN = 0x31;
+    static const uint8_t COMMAND_RACE_LIGHTS_ABORT = 0x32;
 
     Scale& scale_;
     DeviceUi& ui_;

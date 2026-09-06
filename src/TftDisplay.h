@@ -94,6 +94,16 @@ public:
     void setActivePlayer(GameKind game, uint16_t color565, const String& name);
     void clearActivePlayer();
 
+    // Von BleWeightService bei einem 0x30/0x31/0x32-Kommando aufgerufen
+    // (Formel-1-Startampel, siehe ROADMAP.md Punkt 1) - komplett an den
+    // angehaengten LED-Ring weitergereicht (siehe LedRing::startRaceLights()/
+    // raceLightsGreen()/abortRaceLights()). Die Vision zeigt dazu (noch)
+    // nichts auf dem TFT - ohne angehaengten Ring (attachLedRing()) oder auf
+    // Boards ohne bestueckten Ring ein reines No-Op.
+    void startRaceLights(uint16_t holdMs = 0);
+    void raceLightsGreen();
+    void abortRaceLights();
+
     // Gegenstueck zu LedStatusUi::prepareForSleep(). Auf der Vision
     // nichts zu tun: main.cpp schaltet direkt danach POWER_ON ab, was Display
     // und Hintergrundbeleuchtung ohnehin komplett stromlos macht.

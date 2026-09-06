@@ -22,50 +22,47 @@ Hardware) und sagt **nichts über die Priorität**. Sie ist auch keine stabile
 ID: beim Aufräumen wird neu durchnummeriert. Code-Kommentare verweisen
 deshalb über den Titel eines Punktes hierher, nicht über seine Nummer.
 
-## 1. Formel 1 auf dem Gerät nachziehen
+## 1. Formel 1 auf der Vision (TFT) nachziehen
 
 **Idee:** Die App hat mit "Formel 1" ein Zeitspiel bekommen: Glas aufstellen,
 fünf rote Startlampen, nach einer ausgelosten Haltezeit Grün, dann abheben,
 die Mindestmenge der gewählten Strecke (100/200/300 g) wegtrinken und das
 Glas abstellen — gemessen wird die Zeit von Grün bis zum Abstellen, dazu
-Reaktionszeit und Durchfluss in ml/s. Die Waage weiß davon bisher nichts.
+Reaktionszeit und Durchfluss in ml/s.
+
+Auf der Basis zeigt die LED-Leiste die Startampel inzwischen live mit (BLE-
+Kommandos `0x30`-`0x32`, siehe `Config.h` und `LedRing::startRaceLights()`/
+`raceLightsGreen()`/`abortRaceLights()`): die App schickt beim Aufstellen des
+Glases die ausgeloste Haltezeit mit (`Formel1Game`/`GameScreen.tsx`,
+App-Repo), die Waage zählt die fünf Lampen selbst herunter und geht nach
+Ablauf von selbst auf Grün — bei Fehlstart schickt die App zusätzlich den
+Abbruch-Befehl. Die Vision (TFT) weiß davon weiterhin nichts.
 
 **Warum:** Bei diesem Spiel schaut man in genau dem entscheidenden Moment
 NICHT aufs Handy — man greift zum Glas. Der Start gehört deshalb auf das
 Gerät, das direkt vor einem steht, nicht nur auf den Bildschirm daneben.
 
-**Was dafür fehlt:**
+**Was dafür noch fehlt (nur noch Vision):**
 
 - Eintrag in `PICKER_GAMES` (`TftDisplay.cpp`) — die Liste wird von Hand
   synchron zu `GAME_REGISTRY` (App-Repo) gepflegt, ein neues Spiel muss also
   auch hier eingetragen werden. Siehe Punkt 2, der genau diese doppelte
   Pflege abschaffen würde.
-- Eine Ampel-Darstellung als `RemoteCue`: fünf rote Lampen, die nacheinander
-  angehen, dann ausgehen. Das bestehende Cue-Vokabular (Bereit / Away /
-  Ergebnis-Güte) trifft das nicht — "bereit" heißt bei Formel 1 gerade
-  NICHT "du darfst trinken".
-- Offene Frage: Wer bestimmt den Grün-Zeitpunkt? Heute lost ihn die App aus
-  und leitet ihn rechnerisch aus dem Aufstell-Zeitstempel ab
-  (`greenAtMs` in `formel1State.ts`). Schickt die App der Waage nur "starte
-  jetzt eine Ampel mit X ms Haltezeit", oder soll die Waage selbst auslosen?
-  Zweiteres wäre für die Anzeige flüssiger, würde aber die
-  Fehlstart-Bewertung auf zwei Uhren verteilen, die über BLE nur ungenau
-  synchron sind.
-- Die Basisvariante ohne Display kann eine Ampel höchstens über ihre
-  Status-LED andeuten (rot → aus). Ob das reicht oder ob dieses Spiel dort
-  einfach am Handy bleibt, ist nicht entschieden.
-- **Auf dem LED-Ring ist die Ampel dagegen schon fertig** (`LedRing::
-  startRaceLights()` / `raceLightsGreen()` / `abortRaceLights()`, siehe
-  Punkt 6): fünf rote Lampen, Haltezeit, gemeinsames Ausgehen. Beide
-  Varianten der offenen Frage oben sind dort bereits vorgesehen — Haltezeit
-  mitgeben (Waage lost aus) oder Grün von außen setzen (App lost aus). Was
-  fehlt, ist genau die BLE-Hälfte, die diese Methoden auslöst, plus die
-  TFT-Darstellung. Auf der Basis sind die LEDs inzwischen bestückt (8er-
-  Leiste), dort wäre die Ampel also sofort sichtbar; auf der Vision noch
-  nicht.
+- Eine Ampel-Darstellung auf dem TFT selbst: fünf rote Lampen, die
+  nacheinander angehen, dann ausgehen. Das bestehende Cue-Vokabular
+  (Bereit / Away / Ergebnis-Güte) trifft das nicht — "bereit" heißt bei
+  Formel 1 gerade NICHT "du darfst trinken", weshalb `GameScreen.tsx`
+  (App-Repo) für Formel 1 inzwischen bewusst `showReadyCue()`/`showAwayCue()`
+  überspringt und stattdessen die neuen `0x30`-`0x32`-Kommandos schickt - auf
+  der Vision heißt das aktuell: gar keine Sonderanzeige, nur die normale
+  Gewichtsanzeige. Am einfachsten ließe sich das analog zu `LedRing::
+  renderRaceLights()` lösen (eigener `RacePhase`-artiger Zustand statt
+  `RemoteCue`, von denselben `0x30`-`0x32`-Kommandos gefüttert).
 
-**Status:** Nicht begonnen. Das Spiel selbst läuft in der App bereits
-vollständig, auch ohne diese Ergänzung.
+**Status:** Basis-Variante (LED-Leiste) fertig und verdrahtet. Vision (TFT)
+offen — das Spiel selbst läuft in der App bereits vollständig, auch ohne
+diese Ergänzung, auf der Vision zeigt die Waage währenddessen nur nichts
+Zusätzliches an.
 
 ## 2. App-Sync: Geräte-Spielauswahl schaltet die App mit um
 
