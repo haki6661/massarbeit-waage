@@ -1,8 +1,10 @@
 #pragma once
 
 // Geraete-Anzeige der "Basisvariante": dieselbe Methodenoberflaeche wie
-// TftDisplay (siehe DeviceUi.h), aber statt eines Bildschirms gibt es genau
-// eine einfarbige Onboard-LED plus Serial-Ausgabe.
+// TftDisplay (siehe DeviceUi.h), aber statt eines Bildschirms gibt es die
+// einfarbige Onboard-LED plus Serial-Ausgabe. Die WS2812B-Leiste laeuft
+// parallel dazu und haengt nicht an dieser Klasse, sondern an LedRing -
+// weitergereicht wird sie nur ueber attachLedRing() (siehe unten).
 //
 // Die LED kann keine Farben, also traegt das ZEITMUSTER die Information -
 // jeder Zustand bekommt ein eigenes, aus zwei Metern Entfernung
