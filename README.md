@@ -315,6 +315,15 @@ weiter, die App merkt nichts davon.
 | 5V | über High-Side-Schalter, Gate an GPIO10 | über High-Side-Schalter, Gate an GPIO12 |
 | GND | GND (rechter Header) | GND |
 
+Woher die 5V kommen, ist vor dem Aufbau zu klären: der `5V`-Pin des T-OI
+Plus ist USB-VBUS, im reinen Akkubetrieb liegt dort nichts an. Ein mobil
+betriebener Ring braucht also einen Step-up 3,7V -> 5V - und dann hängt man
+`LED_RING_POWER` am besten direkt an dessen EN-Pin: der High-Side-Schalter
+entfällt komplett, und der Wandler spart im Schlaf zusätzlich seinen eigenen
+Ruhestrom. Die Strombilanz begrenzt dabei die sinnvolle Ringgröße: 32 LEDs
+ziehen bei Vollweiß ~1,9A, die ein Step-up sich mit ~2,7A aus der Zelle
+holt - das ist eher ein Netzteil-Aufbau als ein 16340-Aufbau.
+
 Zum High-Side-Schalter: P-MOSFET (AO3401, DMG3415, IRLML6402 o.ä.) mit
 100k-Gate-Pullup nach 5V, dessen Gate ein kleiner N-MOSFET (BSS138, 2N7002,
 BS170) gegen GND zieht, sobald der GPIO HIGH wird. Der N-MOSFET schaltet nur
@@ -325,7 +334,10 @@ GND-Leitung) hebt er den Ring-GND gegen den Board-GND an, was die
 Datenleitung ihren Bezug kostet. Typen wie der BS170 sind zudem trotz
 TO-92-Bequemlichkeit keine Logic-Level-Typen (V_GS(th) bis 3,0V, R_DS(on)
 erst bei V_GS=10V spezifiziert) - bei 3,3V Gate-Spannung schalten sie je
-nach Exemplar nur teilweise durch.
+nach Exemplar nur teilweise durch. In dieser Schaltung stört das nicht: der
+kleine N-MOSFET zieht das Gate des P-MOSFET auf volle -5V V_GS, ein bei
+-4,5V spezifizierter P-Typ reicht also. Auslegen auf den Worst Case, nicht
+auf `LED_RING_MAX_BRIGHTNESS`: 16 LEDs sind bei Vollweiß ~1A, 32 LEDs ~1,9A.
 
 **Vor dem Festlöten prüfen:** ESP32-GPIOs geben 3,3V aus, WS2812B sind für
 5V-Logik spezifiziert (kurze Leitungen laufen meist trotzdem, sicher ist ein

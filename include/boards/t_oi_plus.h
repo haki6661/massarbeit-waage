@@ -137,6 +137,14 @@ constexpr uint8_t STATUS_LED = 3;
 //     ueber die 5V-Versorgung des Rings, sonst kann die erste LED sterben.
 //   - Strom: der Ring haengt an 5V, NICHT an der 16340-Zelle - das Board
 //     kann ihn nicht mitversorgen (siehe LED_RING_MAX_BRIGHTNESS).
+//   - ACHTUNG, WOHER KOMMEN DIE 5V? Der 5V-Pin dieses Boards ist USB-VBUS.
+//     Ohne Kabel liegt dort NICHTS an - im reinen Akkubetrieb hat ein
+//     WS2812B-Ring also gar keine Versorgung. Wer ihn mobil betreiben will,
+//     braucht einen Step-up 3.7V -> 5V. Dessen EN-Pin laesst sich direkt an
+//     LED_RING_POWER haengen (siehe unten), dann entfaellt der High-Side-
+//     Schalter komplett und der Wandler spart im Schlaf auch noch seinen
+//     eigenen Ruhestrom. Vor dem Aufbau am konkreten Board nachmessen, ob
+//     der 5V-Pin wirklich nur an VBUS haengt.
 //   - RUHESTROM: jede WS2812B zieht ~0.6-1mA fuer ihren internen Controller,
 //     auch wenn sie schwarz ist. Bei 16 LEDs sind das ~10-16mA rund um die
 //     Uhr - das leert eine 700mAh-Zelle in unter zwei Tagen und macht den
