@@ -315,26 +315,37 @@ weiter, die App merkt nichts davon.
 | 5V | über High-Side-Schalter, Gate an GPIO10 | über High-Side-Schalter, Gate an GPIO12 |
 | GND | GND (rechter Header) | GND |
 
-Woher die 5V kommen, ist vor dem Aufbau zu klären. Aus dem Akku jedenfalls
-nicht: der T-OI Plus hat nur einen Abwärtspfad (LDO auf 3,3V) und einen
-Laderegler, keinen Step-up - aus 3,7V Zellspannung werden ohne
-Aufwärtswandler keine 5V. Was am `5V`-Pin anliegt, hängt an der Beschaltung
-und ist nachzumessen (Akku dran, USB ab, gegen GND):
+Woher die 5V kommen: der Pin heißt zwar `5V`, führt aber die System-Schiene
+des Boards, nicht konstante 5V. Laut offiziellem Schaltplan
+(`schematic/T-OI_PLUS_Schematic.pdf` im LilyGO-Repo) laufen beide Quellen auf
+denselben Knoten und von dort über den Power-Schalter auf den Header-Pin:
 
-- **Nur USB-VBUS** → ohne Kabel 0V. Mobil braucht der Ring dann einen
-  Step-up 3,7V → 5V; dessen EN-Pin hängt man am besten direkt an
-  `LED_RING_POWER`, dann entfällt der High-Side-Schalter komplett und der
-  Wandler spart im Schlaf zusätzlich seinen eigenen Ruhestrom.
-- **Die Rail vor dem LDO** → im Akkubetrieb liegt dort die Zellspannung
-  (~3,7-4,2V). WS2812B laufen damit durchaus, nur etwas dunkler und im
-  Farbton leicht wärmer; unter ~3,5V werden sie unzuverlässig. Nebeneffekt:
-  das Pegelproblem verschwindet (die Datenleitung braucht ~0,7×VDD, bei 4,0V
-  also 2,8V - die 3,3V des ESP32 liegen sauber darüber), ein Level-Shifter
-  ist dann unnötig.
+```
+VBUS --[D13 BAT20J Schottky]--+
+                              +--[SW2 Power-Schalter]--> "5V"-Header-Pin
+VBAT --[Q2 Si2307 P-MOSFET]---+                     \--> ME6211 LDO --> 3V3
+```
 
-Die Strombilanz begrenzt in beiden Fällen die sinnvolle Ringgröße: 32 LEDs
-ziehen bei Vollweiß ~1,9A, die ein Step-up sich mit ~2,7A aus der Zelle
-holt - das ist eher ein Netzteil-Aufbau als ein 16340-Aufbau.
+Also ~4,7V am USB (VBUS minus Schottky) und ~3,7-4,2V im Akkubetrieb
+(Zellspannung, direkt durchgeschaltet). Einen Step-up hat das Board nicht.
+Für den Ring heißt das:
+
+- **Am USB** läuft er normal.
+- **Am Akku** läuft er dunkler und im Farbton leicht wärmer, unter ~3,5V
+  Zellspannung wird er unzuverlässig. Nebeneffekt: das Pegelproblem
+  verschwindet (die Datenleitung braucht ~0,7×VDD, bei 4,0V also 2,8V - die
+  3,3V des ESP32 liegen sauber darüber), ein Level-Shifter ist unnötig.
+- **Große Ringe nicht über diesen Pin speisen:** der Strom liefe sonst durch
+  den kleinen Schiebeschalter SW2 auf dem Board, der dafür nicht ausgelegt
+  ist. Ab etwa einem halben Ampere direkt an der Zelle abgreifen oder extern
+  speisen. 32 LEDs ziehen bei Vollweiß ~1,9A - das ist ohnehin eher ein
+  Netzteil-Aufbau als ein 16340-Aufbau.
+
+Misst man am `5V`-Pin deutlich unter 3,5V, ist nicht der Pin schuld, sondern
+die Zelle: entweder fast leer, oder es steckt eine **CR123A-Primärzelle** im
+Halter. Die hat dieselbe Baugröße wie eine 16340, liefert aber nur ~3V und
+ist **nicht ladbar** - der TP4054 an Bord würde es beim nächsten USB-Kabel
+trotzdem versuchen.
 
 Zum High-Side-Schalter: P-MOSFET (AO3401, DMG3415, IRLML6402 o.ä.) mit
 100k-Gate-Pullup nach 5V, dessen Gate ein kleiner N-MOSFET (BSS138, 2N7002,
