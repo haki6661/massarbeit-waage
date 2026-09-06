@@ -144,8 +144,28 @@ constexpr uint8_t STATUS_LED = 3;
 //     NICHT, es macht die LEDs nur dunkel. Der Ring braucht deshalb einen
 //     Schalt-MOSFET (P-Kanal high-side oder Load-Switch) in seiner
 //     5V-Zuleitung, der vor dem Schlafen abschaltet - dafuer ist noch kein
-//     GPIO vorgesehen (siehe ROADMAP.md, Punkt zum LED-Ring).
+//     GPIO vorgesehen - dafuer ist LED_RING_POWER da, siehe unten.
 constexpr uint8_t LED_RING_DATA = 4;
+
+// Schaltet die 5V-Zuleitung des Rings ueber einen High-Side-Schalter
+// (P-MOSFET mit Gate-Pullup nach 5V + kleiner N-MOSFET als Pegelwandler,
+// oder ein fertiger Load-Switch). HIGH = Ring hat Strom, LOW/hochohmig =
+// Ring komplett tot.
+//
+// Diese Polaritaet ist Absicht und nicht beliebig: im Deep Sleep und
+// waehrend des Bootens ist der GPIO hochohmig, der Gate-Pullup schaltet den
+// P-MOSFET dann von selbst AUS. Der Ruhestrom der LEDs (~0.6-1mA je Stueck,
+// auch wenn sie schwarz sind) ist damit sicher weg, ohne dass die Firmware
+// im Schlaf noch irgendetwas halten muesste.
+//
+// GPIO10 ist auf dem T-OI Plus der letzte voellig freie Header-Pin (linke
+// Reihe, unterster vor 3V3, Aufdruck "10"): kein Strapping-Pin (das sind am
+// C3 GPIO2/8/9), kein UART (GPIO20/21), kein ADC, den wir brauchen. Dass er
+// im Pinmap als FSPI_CS0 gefuehrt wird, stoert nicht - der interne Flash des
+// C3 haengt an eigenen, gar nicht herausgefuehrten Leitungen (gleiche
+// Argumentation wie bei HX711_DOUT/SCK oben). Alternative, falls GPIO10
+// anderweitig gebraucht wird: GPIO18/19, die auch am Grove-Stecker liegen.
+constexpr uint8_t LED_RING_POWER = 10;
 
 // --- Batterie -------------------------------------------------------------
 // GPIO2 = ADC1_CH2, haengt ueber den Onboard-Spannungsteiler an der

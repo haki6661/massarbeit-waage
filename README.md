@@ -256,10 +256,13 @@ begrenzt ohnehin die Selbstentladung der Zelle (2-5%/Monat).
 **Wichtig für den LED-Ring:** WS2812B ziehen ~0,6-1mA je LED für ihren
 internen Controller, **auch wenn sie dunkel sind** - 16 LEDs sind ~10-16mA
 rund um die Uhr und leeren dieselbe Zelle in unter zwei Tagen.
-`LedRing::prepareForSleep()` hilft dagegen nicht, es macht die LEDs nur
-schwarz. Ein fest verbauter Ring braucht deshalb einen Schalt-MOSFET in
-seiner 5V-Zuleitung; dafür ist bisher kein GPIO vorgesehen (siehe
-`ROADMAP.md`).
+Dunkelschalten allein hilft dagegen nicht. Der Ring wird deshalb über
+`Pins::LED_RING_POWER` (Basis GPIO10, Vision GPIO12) komplett stromlos
+geschaltet - dafür braucht er einen High-Side-Schalter in seiner
+5V-Zuleitung (P-MOSFET mit Gate-Pullup nach 5V + kleiner N-MOSFET als
+Pegelwandler, oder ein fertiger Load-Switch). Die Polarität ist bewusst so
+herum, dass ein hochohmiger GPIO - Deep Sleep, Boot, Reset - den Ring
+ausschaltet.
 
 ### Was die Status-LED der Basis sagt
 
@@ -297,12 +300,20 @@ weiter, die App merkt nichts davon.
 
 **Scharfschalten (drei Handgriffe):**
 
-1. Ring anlöten, Datenleitung an `Pins::LED_RING_DATA` - Vision GPIO13,
-   Basis GPIO4 (Begründung der Pinwahl steht im jeweiligen Board-Profil).
+1. Ring anlöten (Verdrahtung siehe Tabelle unten): Datenleitung an
+   `Pins::LED_RING_DATA`, 5V-Zuleitung über einen High-Side-Schalter an
+   `Pins::LED_RING_POWER`. Begründung der Pinwahl steht im jeweiligen
+   Board-Profil.
 2. Im Board-Profil `MASSARBEIT_HAS_LED_RING` auf `1` setzen und
    `MASSARBEIT_LED_RING_COUNT` auf die tatsächliche LED-Zahl (Vorgabe: 16).
 3. In `platformio.ini` die auskommentierte Zeile
    `adafruit/Adafruit NeoPixel@^1.12.0` einkommentieren.
+
+| Ring | Basis (T-OI Plus) | Vision (T-Display S3) |
+|---|---|---|
+| DIN (Daten) | GPIO4, über 300-500Ω | GPIO13, über 300-500Ω |
+| 5V | über High-Side-Schalter, Gate an GPIO10 | über High-Side-Schalter, Gate an GPIO12 |
+| GND | GND (rechter Header) | GND |
 
 **Vor dem Festlöten prüfen:** ESP32-GPIOs geben 3,3V aus, WS2812B sind für
 5V-Logik spezifiziert (kurze Leitungen laufen meist trotzdem, sicher ist ein

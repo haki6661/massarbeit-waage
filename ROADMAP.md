@@ -232,12 +232,14 @@ README, "LED-Ring nachrüsten"):
   sie schwarz sind - 16 LEDs sind ~10-16mA rund um die Uhr und leeren eine
   700mAh-Zelle in unter zwei Tagen. `LedRing::prepareForSleep()` hilft
   dagegen nichts, es macht die LEDs nur dunkel. Ohne diese Abschaltung ist
-  der ganze Deep Sleep wertlos, sobald ein Ring fest verbaut ist. Auf der
-  Basis wird der GPIO knapp: GPIO4 ist mit der Datenleitung schon verplant,
-  frei wären nur noch die JTAG-Pins neben dem HX711. Auf der Vision ist Platz
-  reichlich. Firmwareseitig ist das ein Pin-Define plus zwei Zeilen in
-  `LedRing::begin()`/`prepareForSleep()` - die Entscheidung ist eine
-  Hardware-Entscheidung, deshalb steht sie hier und nicht im Code.
+  der ganze Deep Sleep wertlos, sobald ein Ring fest verbaut ist.
+  Firmwareseitig ist das bereits erledigt: `Pins::LED_RING_POWER` (Basis
+  GPIO10, Vision GPIO12) wird in `LedRing::begin()` eingeschaltet und in
+  `prepareForSleep()` wieder abgeschaltet. Was fehlt, ist der Schalter selbst
+  — P-MOSFET high-side mit Gate-Pullup nach 5V plus kleiner N-MOSFET als
+  Pegelwandler, oder ein fertiger Load-Switch. Die Polarität ist bewusst so
+  herum, dass ein hochohmiger GPIO (Deep Sleep, Boot, Reset) den Ring
+  ausschaltet — die Firmware muss im Schlaf also nichts halten.
 
 **Offene Fragen, noch nicht entschieden:**
 

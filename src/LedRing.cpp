@@ -185,6 +185,14 @@ void LedRing::begin() {
         return;
     }
 #if MASSARBEIT_HAS_LED_RING
+    // Erst Strom auf den Ring, dann der erste Datenrahmen: die WS2812B
+    // brauchen einen Moment, bis ihre interne Logik nach dem Einschalten
+    // sauber steht - ein Frame in diese Phase hinein kommt bei der ersten
+    // LED gern verstuemmelt an.
+    pinMode(Pins::LED_RING_POWER, OUTPUT);
+    digitalWrite(Pins::LED_RING_POWER, HIGH);
+    delay(2);
+
     strip.begin();
     strip.clear();
     strip.show();
@@ -200,6 +208,14 @@ void LedRing::prepareForSleep() {
     if (!ENABLED || !ready_) return;
     clear();
     show();
+#if MASSARBEIT_HAS_LED_RING
+    // Dunkelschalten allein reicht NICHT: jede WS2812B zieht ~0.6-1mA fuer
+    // ihren internen Controller, auch wenn sie schwarz ist. Bei 16 LEDs sind
+    // das ~10-16mA rund um die Uhr - mehr als alles andere im Deep Sleep
+    // zusammen, und genug, um eine 700mAh-Zelle in unter zwei Tagen zu
+    // leeren. Deshalb wird der Ring hier komplett stromlos geschaltet.
+    digitalWrite(Pins::LED_RING_POWER, LOW);
+#endif
     ready_ = false;
 }
 

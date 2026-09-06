@@ -108,4 +108,11 @@ constexpr uint8_t HX711_SCK  = 2;
 // der 5V-Zuleitung, sonst ist der Deep Sleep wertlos) siehe t_oi_plus.h.
 constexpr uint8_t LED_RING_DATA = 13;
 
+// 5V-Zuleitung des Rings, gleiche Beschaltung und gleiche Polaritaet wie auf
+// der Basis (High-Side-Schalter, HIGH = an, hochohmig = aus) - die
+// ausfuehrliche Begruendung steht in t_oi_plus.h. GPIO12 liegt auf der
+// Stiftleiste, ist kein Strapping-Pin und wird vom Display-Bus nicht
+// benutzt; wie bei GPIO13 vor dem Festloeten einmal gegenpruefen.
+constexpr uint8_t LED_RING_POWER = 12;
+
 } // namespace Pins
