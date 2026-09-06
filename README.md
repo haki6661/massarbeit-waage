@@ -37,10 +37,11 @@ Aktueller Stand: HX711-Handling + Kalibrierroutine + BLE-Gewichts-/Akkuservice
 (inkl. Fernsteuerung der Anzeige durch die App, siehe Abschnitt "BLE"
 weiter unten) + TFT-Anzeige mit Spieler-Badge und spielspezifischen
 Away-Animationen + Pixel-Art-Sprite-Bootanimation (siehe `data/`) +
-Status-LED-Anzeige derselben Zustände auf der Basis + WS2812B-Lichtleiste +
-Taster-Bedienung und Deep-Sleep-Stromsparmodus (nur Vision) + Firmware-Update direkt aus der App per BLE (kein
-WLAN am Partyort nötig, siehe Abschnitt "Firmware-Update per BLE" weiter
-unten) + Entwicklungs-OTA per WLAN (nur Vision). Die Away-/Ergebnis-
+Status-LED-Anzeige derselben Zustände auf der Basis + WS2812B-Lichtleiste
+(Basis) inkl. Formel-1-Startampel + Taster-Bedienung und Deep-Sleep-
+Stromsparmodus (nur Vision) + Firmware-Update direkt aus der App per BLE
+(kein WLAN am Partyort nötig, siehe Abschnitt "Firmware-Update per BLE"
+weiter unten) + Entwicklungs-OTA per WLAN (nur Vision). Die Away-/Ergebnis-
 Animationen (nicht der Boot) sind weiterhin rein prozedural aus
 Linien/Kreisen/Formen, kein Sprite noetig.
 
@@ -415,7 +416,8 @@ auf `LED_RING_MAX_BRIGHTNESS`: 16 LEDs sind bei Vollweiß ~1A, 32 LEDs ~1,9A.
 **Vor dem Festlöten prüfen:** ESP32-GPIOs geben 3,3V aus, WS2812B sind für
 5V-Logik spezifiziert (kurze Leitungen laufen meist trotzdem, sicher ist ein
 Level-Shifter); 300-500Ω in die Datenleitung, ~1000µF über die 5V-Versorgung
-des Rings; der Ring hängt an 5V, **nicht** an der Akkuzelle. Die harte
+des Rings. Woher die 5V kommen, steht weiter oben - auf der Basis ist es die
+System-Schiene des Boards, im Akkubetrieb also Zellspannung. Die harte
 Helligkeitsobergrenze `LED_RING_MAX_BRIGHTNESS` (`include/Config.h`, Vorgabe
 40/255) sitzt bewusst in `LedRing::show()`, also an der einzigen Stelle, die
 wirklich Strom schaltet - bei Vollweiß zieht jede LED sonst bis zu ~60mA.
@@ -435,21 +437,20 @@ Status-LED der Basis):
 | daneben (`0x12`) | ein langsam abfallendes Rot |
 | Gewicht auf der Waage | Balken in Spieler-/Spielfarbe, wächst mit dem Gewicht (Vollausschlag bei `LED_RING_WEIGH_FULL_SCALE_G`, Vorgabe 400g) |
 | Spieler am Zug | langsames Atmen in der Spielerfarbe (`0x14`) |
-| wartet auf die App | einzelner blauer Punkt kreist |
-| verbunden, Leerlauf | sehr schwaches Atmen im Akzentton |
+| wartet auf die App | einzelner blauer Punkt wandert (auf einer geraden Leiste hin und her, auf einem Ring rundum) |
+| verbunden, Leerlauf | ruhiges Atmen im Akzentton, nie ganz dunkel - das "die Waage ist an"-Signal |
 
 Der Wiege-Balken ist das einzige Muster, das es weder auf dem TFT noch auf
 der Status-LED gibt: beim Einschenken schaut man aufs Glas, nicht aufs
 Display - ein wachsender Lichtbogen im Deckel liegt genau im Blickfeld.
 
-Die Startampel ist bewusst schon vollständig da, obwohl das Spiel "Formel 1"
-die Waage bisher gar nicht anspricht: `LedRing::startRaceLights()` /
-`raceLightsGreen()` / `abortRaceLights()` funktionieren, es fehlt nur die
-BLE-Hälfte, die sie aus der App auslöst (siehe `ROADMAP.md`, "Formel 1 auf
-dem Gerät nachziehen"). Beide Varianten der offenen Frage "wer bestimmt
-Grün?" sind ohne weitere Änderung möglich: Haltezeit an `startRaceLights()`
-mitgeben (Waage lost aus) oder `startRaceLights(0)` und später
-`raceLightsGreen()` (App lost aus, wie heute in `formel1State.ts`).
+Die Startampel läuft: die App löst sie per BLE aus (`0x30`/`0x31`/`0x32`,
+siehe Abschnitt "BLE") und schickt beim Aufstellen des Glases die ausgeloste
+Haltezeit mit - die Waage zählt die fünf Lampen dann selbst herunter und geht
+ohne weiteres Kommando auf Grün. Der umgekehrte Weg ist ebenfalls vorgesehen:
+`0x30` mit `holdMs = 0` lässt die Lampen stehen, bis die App `0x31` schickt.
+Auf dem TFT der Vision fehlt die Ampel noch (siehe `ROADMAP.md`, "Formel 1
+auf der Vision (TFT) nachziehen").
 
 ## Kalibrieren (Schritt 4 - mit der 3kg-Zelle neu ermitteln)
 
@@ -478,9 +479,9 @@ unten). Eine weitere Read-Characteristic (`6E40000A-…`) liefert Modell und
 Fähigkeiten als UTF-8-JSON:
 
 ```json
-{"model":"t-oi-plus","name":"Massarbeit","fw":"1.7.1",
+{"model":"t-oi-plus","name":"Massarbeit","fw":"1.10.0",
  "variant":"t-oi-plus",
- "caps":{"display":false,"battery":true,"buttons":1,"led":true,"ota":true}}
+ "caps":{"display":false,"battery":true,"buttons":0,"led":true,"ota":true}}
 ```
 
 Daran erkennt die App beim Verbinden, welches Modell dranhängt, und stellt
