@@ -39,15 +39,29 @@
 // NeoPixel-Beispiele in LilyGOs Repo gehoeren zum aufsteckbaren RGB-Shield
 // (7 Pixel, Datenpin ueber DIP-Schalter waehlbar), nicht zum Board selbst.
 #define MASSARBEIT_STATUS_LED_RGB  0
-// WS2812B-Lichtring im Deckel: vorbereitet, aber AUS - die Firmware bringt
-// die komplette Lichtlogik schon mit (src/LedRing.h), es fehlt nur die
-// Hardware. Auf 1 setzen, sobald ein Ring an Pins::LED_RING_DATA haengt UND
-// die NeoPixel-Abhaengigkeit in platformio.ini aktiviert ist; dann auch
-// MASSARBEIT_LED_RING_COUNT auf die tatsaechliche LED-Zahl korrigieren.
-// Fuer die Basis waere der Ring die erste echte Farbanzeige ueberhaupt - die
-// einfarbige Onboard-LED laeuft unveraendert weiter, beide ergaenzen sich.
-#define MASSARBEIT_HAS_LED_RING    0
-#define MASSARBEIT_LED_RING_COUNT  16
+// WS2812B-Lichtleiste: AKTIV. Erste bestueckte Ausbaustufe ist eine gerade
+// 8er-Leiste am Steckbrett-/Werkbankaufbau, noch kein Ring im Deckel - die
+// Lichtlogik ist dieselbe (src/LedRing.h), nur die Geometrie unterscheidet
+// sich (siehe MASSARBEIT_LED_RING_IS_STRIP). Die einfarbige Onboard-LED
+// laeuft unveraendert weiter, beide ergaenzen sich.
+// Beim Wechsel auf einen echten Ring: COUNT anpassen und IS_STRIP auf 0.
+#define MASSARBEIT_HAS_LED_RING    1
+#define MASSARBEIT_LED_RING_COUNT  8
+
+// 1 = gerade Leiste, 0 = geschlossener Ring. Bestimmt, wie sich bewegte
+// Muster verhalten: auf einem Ring laufen sie im Kreis weiter, auf einer
+// Leiste pendeln sie hin und her. Ein Punkt, der am Ende der Leiste
+// verschwindet und vorne wieder auftaucht, sieht dort nach Fehler aus, nicht
+// nach Animation.
+#define MASSARBEIT_LED_RING_IS_STRIP 1
+
+// 1 = die 5V-Zuleitung haengt an einem Schalt-MOSFET an Pins::LED_RING_POWER
+// (siehe README), 0 = fest verdrahtet. Beim aktuellen Aufbau haengt die
+// Leiste direkt an 5V und GND, abgeschaltet wird alles zusammen ueber den
+// Schiebeschalter des Boards - der trennt die komplette System-Schiene, also
+// auch die LEDs. Der MOSFET wird erst noetig, wenn der Ring fest im Deckel
+// sitzt UND das Geraet wieder schlafen statt ausgeschaltet werden soll.
+#define MASSARBEIT_LED_RING_HAS_POWER_SWITCH 0
 #define MASSARBEIT_HAS_BATTERY     1
 #define MASSARBEIT_BUTTON_COUNT    1
 #define MASSARBEIT_HAS_POWER_ON    0
@@ -61,6 +75,30 @@
 // wird stattdessen ueber esp_deep_sleep_enable_gpio_wakeup(), siehe
 // enterDeepSleep() in main.cpp.
 #define MASSARBEIT_WAKEUP_USES_EXT0 0
+
+// HX711_SCK ist hier GPIO7 - RTC-faehig sind am C3 nur GPIO0-5, der Pegel
+// laesst sich ueber den Deep Sleep also NICHT einfrieren.
+//
+// Folge fuers Stromsparen: Scale::powerDown() schickt den HX711 zwar auch
+// hier in den Standby (~0.3µA statt ~1.4-1.6mA), aber sobald der Chip
+// schlaeft, wird PD_SCK hochohmig - ob der HX711 dann im Standby bleibt,
+// haengt allein an Leckstroemen und ist nicht garantiert. Wer die
+// Standby-Zeit der Basis wirklich braucht, loetet einen Pullup (~10k) von
+// HX711_SCK nach 3V3: dann haelt der Pegel auch ohne aktiven Treiber, und
+// im Betrieb zieht der GPIO ihn ohne Weiteres gegen den Widerstand nach
+// unten. Ohne diesen Widerstand einfach nachmessen, bevor man sich auf eine
+// Laufzeit verlaesst.
+#define MASSARBEIT_HX711_SCK_CAN_HOLD 0
+
+// Kein Aufweck-Taster verbaut: ein und aus macht allein der Schiebeschalter
+// des Boards (bzw. ein extern parallel dazu gelegter, siehe README). Der
+// trennt wirklich die Stromversorgung, statt nur schlafen zu legen - damit
+// braucht die Basis den Deep Sleep nicht mehr. Der Auto-Sleep MUSS in diesem
+// Aufbau aus bleiben (siehe AUTO_SLEEP_TIMEOUT_MS in Config.h): ohne
+// Aufweck-Taster waere die Waage nach dem Einschlafen bis zum Aus- und
+// Wiedereinschalten tot. Wird spaeter doch ein Taster angeloetet, hier auf 1
+// setzen - dann greift der Auto-Sleep automatisch wieder.
+#define MASSARBEIT_HAS_WAKE_BUTTON 0
 
 // Spannungsteiler vor dem Batterie-ADC: Faktor 2, exakt wie in LilyGOs
 // eigenem example/battery_voltage (`readADC_Cal(analogRead(BAT_ADC)) * 2`).
@@ -123,7 +161,58 @@ constexpr uint8_t STATUS_LED = 3;
 //     ueber die 5V-Versorgung des Rings, sonst kann die erste LED sterben.
 //   - Strom: der Ring haengt an 5V, NICHT an der 16340-Zelle - das Board
 //     kann ihn nicht mitversorgen (siehe LED_RING_MAX_BRIGHTNESS).
+//   - WOHER KOMMEN DIE 5V? Der Pin heisst zwar "5V", fuehrt aber die
+//     System-Schiene des Boards, nicht konstante 5V. Laut offiziellem
+//     Schaltplan (schematic/T-OI_PLUS_Schematic.pdf im LilyGO-Repo):
+//       VBUS --[D13, BAT20J Schottky]--+
+//                                      +--[SW2 Power-Schalter]--> "+5V"-Pin
+//       VBAT --[Q2, Si2307 P-MOSFET]---+                          --> ME6211 LDO --> 3V3
+//     Mit USB liegen dort also ~4.7V an (VBUS minus Schottky), im
+//     Akkubetrieb schaltet Q2 die Zelle direkt durch: ~3.7-4.2V, also
+//     Zellspannung statt 5V. Einen Step-up hat das Board nicht.
+//     Fuer einen WS2812B-Ring heisst das:
+//       - Am USB laeuft er normal.
+//       - Am Akku laeuft er dunkler und im Farbton leicht waermer, unter
+//         ~3.5V Zellspannung wird er unzuverlaessig. Nebeneffekt: das
+//         Pegelproblem verschwindet (die Datenleitung braucht ~0.7*VDD, bei
+//         4.0V also 2.8V - die 3.3V des C3 liegen sauber darueber).
+//       - Grosse Ringe NICHT ueber diesen Pin speisen: der Strom liefe
+//         sonst durch den kleinen Schiebeschalter SW2 auf dem Board (solche
+//         Schalter sind oft nur fuer einige hundert mA gut). Ab etwa einem
+//         halben Ampere direkt an der Zelle abgreifen oder extern speisen.
+//     Misst man dort deutlich unter 3.5V, ist nicht der Pin schuld, sondern
+//     die Zelle: entweder fast leer, oder es steckt eine CR123A-Primaerzelle
+//     im Halter (gleiche Baugroesse wie 16340, aber nur ~3V - und NICHT
+//     ladbar, der TP4054 an Bord wuerde es trotzdem versuchen).
+//   - RUHESTROM: jede WS2812B zieht ~0.6-1mA fuer ihren internen Controller,
+//     auch wenn sie schwarz ist. Bei 16 LEDs sind das ~10-16mA rund um die
+//     Uhr - das leert eine 700mAh-Zelle in unter zwei Tagen und macht den
+//     ganzen Deep Sleep zunichte. LedRing::prepareForSleep() hilft dagegen
+//     NICHT, es macht die LEDs nur dunkel. Der Ring braucht deshalb einen
+//     Schalt-MOSFET (P-Kanal high-side oder Load-Switch) in seiner
+//     5V-Zuleitung, der vor dem Schlafen abschaltet - dafuer ist noch kein
+//     GPIO vorgesehen - dafuer ist LED_RING_POWER da, siehe unten.
 constexpr uint8_t LED_RING_DATA = 4;
+
+// Schaltet die 5V-Zuleitung des Rings ueber einen High-Side-Schalter
+// (P-MOSFET mit Gate-Pullup nach 5V + kleiner N-MOSFET als Pegelwandler,
+// oder ein fertiger Load-Switch). HIGH = Ring hat Strom, LOW/hochohmig =
+// Ring komplett tot.
+//
+// Diese Polaritaet ist Absicht und nicht beliebig: im Deep Sleep und
+// waehrend des Bootens ist der GPIO hochohmig, der Gate-Pullup schaltet den
+// P-MOSFET dann von selbst AUS. Der Ruhestrom der LEDs (~0.6-1mA je Stueck,
+// auch wenn sie schwarz sind) ist damit sicher weg, ohne dass die Firmware
+// im Schlaf noch irgendetwas halten muesste.
+//
+// GPIO10 ist auf dem T-OI Plus der letzte voellig freie Header-Pin (linke
+// Reihe, unterster vor 3V3, Aufdruck "10"): kein Strapping-Pin (das sind am
+// C3 GPIO2/8/9), kein UART (GPIO20/21), kein ADC, den wir brauchen. Dass er
+// im Pinmap als FSPI_CS0 gefuehrt wird, stoert nicht - der interne Flash des
+// C3 haengt an eigenen, gar nicht herausgefuehrten Leitungen (gleiche
+// Argumentation wie bei HX711_DOUT/SCK oben). Alternative, falls GPIO10
+// anderweitig gebraucht wird: GPIO18/19, die auch am Grove-Stecker liegen.
+constexpr uint8_t LED_RING_POWER = 10;
 
 // --- Batterie -------------------------------------------------------------
 // GPIO2 = ADC1_CH2, haengt ueber den Onboard-Spannungsteiler an der

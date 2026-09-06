@@ -26,6 +26,12 @@
 // Zustaende nur rundum sichtbar nach aussen.
 #define MASSARBEIT_HAS_LED_RING    0
 #define MASSARBEIT_LED_RING_COUNT  16
+// Geschlossener Ring (0) statt gerader Leiste - auf der Vision ist der Ring
+// von vornherein fuer den Deckel gedacht, siehe t_oi_plus.h.
+#define MASSARBEIT_LED_RING_IS_STRIP 0
+// Hier mit Schalt-MOSFET geplant: die Vision behaelt ihren Deep Sleep (sie
+// hat einen Aufweck-Taster), und im Schlaf muessen die LEDs stromlos werden.
+#define MASSARBEIT_LED_RING_HAS_POWER_SWITCH 1
 #define MASSARBEIT_HAS_BATTERY     1
 #define MASSARBEIT_BUTTON_COUNT    2
 #define MASSARBEIT_HAS_POWER_ON    1
@@ -34,6 +40,16 @@
 // Der S3 kann per ext0 aus dem Deep Sleep geweckt werden (der C3 der Basis
 // nicht, siehe dortiges Profil).
 #define MASSARBEIT_WAKEUP_USES_EXT0 1
+
+// HX711_SCK ist hier GPIO2 und damit RTC-faehig (am S3 sind das GPIO0-21).
+// Der Pin-Pegel laesst sich also ueber den Deep Sleep einfrieren - noetig,
+// damit der vor dem Schlafen ausgeloeste HX711-Standby auch haelt (siehe
+// Scale::powerDown() und enterDeepSleep() in main.cpp).
+#define MASSARBEIT_HX711_SCK_CAN_HOLD 1
+
+// Aufweck-Taster vorhanden (Taste 2) - der Auto-Sleep bleibt damit aktiv,
+// siehe AUTO_SLEEP_TIMEOUT_MS in Config.h.
+#define MASSARBEIT_HAS_WAKE_BUTTON 1
 
 // Spannungsteiler vor dem Batterie-ADC (Faktor 2), siehe LilyGOs
 // GetBatteryVoltage-Beispiel.
@@ -97,7 +113,16 @@ constexpr uint8_t HX711_SCK  = 2;
 //   GPIO3           - Strapping-Pin (JTAG-Quellwahl).
 // Ob GPIO13 auf dem konkreten Board-Revisionsstand wirklich frei liegt, vor
 // dem Festloeten einmal mit dem Multimeter gegenpruefen - dieselbe Vorsicht
-// wie bei den HX711-Pins oben. Zum Pegel-/Strom-Thema siehe t_oi_plus.h.
+// wie bei den HX711-Pins oben. Zum Pegel-Thema und vor allem zum RUHESTROM
+// des Rings (~0.6-1mA je LED, auch dunkel - braucht einen Schalt-MOSFET in
+// der 5V-Zuleitung, sonst ist der Deep Sleep wertlos) siehe t_oi_plus.h.
 constexpr uint8_t LED_RING_DATA = 13;
+
+// 5V-Zuleitung des Rings, gleiche Beschaltung und gleiche Polaritaet wie auf
+// der Basis (High-Side-Schalter, HIGH = an, hochohmig = aus) - die
+// ausfuehrliche Begruendung steht in t_oi_plus.h. GPIO12 liegt auf der
+// Stiftleiste, ist kein Strapping-Pin und wird vom Display-Bus nicht
+// benutzt; wie bei GPIO13 vor dem Festloeten einmal gegenpruefen.
+constexpr uint8_t LED_RING_POWER = 12;
 
 } // namespace Pins
