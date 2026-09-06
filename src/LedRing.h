@@ -1,34 +1,30 @@
 #pragma once
 
-// WS2812B-RGB-LED-Ring (5V, adressierbar) im Deckel - VORBEREITET, aber in
-// beiden Geraetevarianten standardmaessig AUSGESCHALTET.
-// Siehe ROADMAP.md, "WS2812B-RGB-LED-Ring im Deckel fuer visuelle Cues".
+// WS2812B-Lichtleiste bzw. -ring (5V, adressierbar).
+// Siehe ROADMAP.md, "WS2812B-RGB-LED-Ring im Deckel bestuecken und
+// scharfschalten".
 //
 // ---------------------------------------------------------------------------
-// Was hier schon fertig ist und was noch fehlt
+// Wo das gerade laeuft
 // ---------------------------------------------------------------------------
-// Fertig: die komplette Lichtlogik - Zustandsauswahl, Prioritaeten, alle
-// Muster (Ampel/Formel 1, Away je Spiel, Ergebnis-Gueten, Wiege-Balken,
-// Spielerfarbe, Verbindungszustand), Helligkeitsdeckel und Gamma.
-// Fehlt zum Scharfschalten (drei Handgriffe, siehe README, Abschnitt
-// "LED-Ring nachruesten"):
-//   1. Ring anloeten, Datenleitung an Pins::LED_RING_DATA (Board-Profil).
-//   2. `MASSARBEIT_HAS_LED_RING` im Board-Profil auf 1 und
-//      `MASSARBEIT_LED_RING_COUNT` auf die tatsaechliche LED-Zahl setzen.
-//   3. In platformio.ini die auskommentierte NeoPixel-Abhaengigkeit
-//      aktivieren.
+// Basis  (t_oi_plus.h):    AKTIV - gerade 8er-Leiste, direkt an 5V/GND.
+// Vision (t_display_s3.h): noch AUS - dort ist ein Ring im Deckel geplant.
+//
+// Freigegeben wird das je Board-Profil ueber MASSARBEIT_HAS_LED_RING; dazu
+// gehoeren MASSARBEIT_LED_RING_COUNT (LED-Zahl), _IS_STRIP (Geometrie) und
+// _HAS_POWER_SWITCH (Schalt-MOSFET in der 5V-Zuleitung, siehe README).
 //
 // ---------------------------------------------------------------------------
-// Warum das Modul trotzdem immer mitkompiliert wird
+// Warum das Modul auch ausgeschaltet mitkompiliert wird
 // ---------------------------------------------------------------------------
 // `ENABLED` ist ein `static constexpr bool` aus dem Board-Profil, kein
 // #if um die halbe Datei. Jede oeffentliche Methode steigt als Erstes ueber
 // `if (!ENABLED) return;` aus - der Compiler wirft den gesamten Rumpf danach
 // als toten Code weg, das ausgeschaltete Binary waechst also praktisch nicht.
 // Gleichzeitig wird die Lichtlogik bei JEDEM Build durchkompiliert und kann
-// nicht unbemerkt verrotten, waehrend sie in der Schublade liegt. Nur der
-// Zugriff auf die NeoPixel-Bibliothek selbst haengt an einem echten #if -
-// die Abhaengigkeit existiert im ausgeschalteten Build ja gar nicht.
+// in der Variante, die sie gerade nicht nutzt, nicht unbemerkt verrotten.
+// Nur der Zugriff auf die NeoPixel-Bibliothek selbst haengt an einem echten
+// #if - im ausgeschalteten Build soll sie gar nicht erst eingebunden werden.
 //
 // ---------------------------------------------------------------------------
 // Verhaeltnis zu TftDisplay/LedStatusUi
