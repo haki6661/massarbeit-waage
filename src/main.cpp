@@ -7,7 +7,9 @@
 #include "Config.h"
 #include "Scale.h"
 #include "BleWeightService.h"
+#if MASSARBEIT_BUTTON_COUNT >= 1
 #include "Buttons.h"
+#endif
 #include "DeviceUi.h"
 #include "LedRing.h"
 #include "Battery.h"
@@ -24,12 +26,16 @@ DeviceUi ui;
 LedRing ledRing;
 Battery battery;
 BleWeightService bleService(scale, ui, battery);
+#if MASSARBEIT_BUTTON_COUNT >= 1
 Buttons buttons;
+#endif
 CalibrationRoutine calibration(scale, ui);
 DevOta devOta;
 
 bool calibrationRequested = false;
+#if MASSARBEIT_BUTTON_COUNT >= 1
 bool sleepRequested = false;
+#endif
 bool devOtaActive = false;
 
 // Fuer runNextBootStep() (siehe unten) - muss ausserhalb von setup() stehen,
@@ -41,6 +47,8 @@ bool bootHx711Ok = true;
 // Fuer den Auto-Sleep-Timer: letzter Zeitpunkt mit "Aktivitaet" (Gewichts-
 // aenderung oder Tastendruck). Bei Ueberschreiten von AUTO_SLEEP_TIMEOUT_MS
 // ohne neue Aktivitaet geht die Waage automatisch schlafen (siehe loop()).
+// Auf Varianten ohne Taster gibt es keinen Deep Sleep, dort laeuft der Timer
+// zwar mit, loest aber nichts aus (AUTO_SLEEP_TIMEOUT_MS ist 0).
 unsigned long lastActivityMs = 0;
 float lastActivityWeight = 0.0f;
 bool activityBaselineSet = false;
@@ -64,17 +72,6 @@ void onButton2Click() {
     lastActivityMs = millis();
 }
 
-#else
-
-// Basis: nur ein Taster, und ohne Display gibt es keine Geraete-Spielauswahl
-// zum Durchschalten - der kurze Klick ist damit frei und uebernimmt Tara
-// (auf der Vision die einzige Tastenfunktion, die weggefallen ist).
-void onButton1Click() {
-    Serial.println("[Button] Kurzer Klick: Tara.");
-    scale.tare();
-    lastActivityMs = millis();
-}
-
 #endif
 
 void onCalibrationRequested() {
@@ -82,9 +79,10 @@ void onCalibrationRequested() {
     lastActivityMs = millis();
 }
 
-// Werkbank-Ersatz fuer den Taster-Doppelklick/Langdruck: "cal" + Enter im
-// Serial Monitor loest dieselbe Kalibrierroutine aus - praktisch, solange
-// (noch) kein Taster angeschlossen ist. Liest zeichenweise ueber mehrere
+// "cal" + Enter im Serial Monitor startet die Kalibrierroutine. Auf der
+// Vision der Ersatz fuer den Taster-Langdruck, auf der Basis (ohne Taster)
+// neben dem BLE-Kommando 0x20/0x21 der einzige Weg - zum Kalibrieren haengt
+// ohnehin ein USB-Kabel dran. Liest zeichenweise ueber mehrere
 // loop()-Durchlaeufe in einen statischen Puffer, bis eine Zeile fertig ist;
 // laeuft nur ausserhalb von calibration.run() (das liest Serial ja selbst
 // blockierend), es gibt also keine Ueberschneidung beim Byte-Verbrauch.
@@ -110,17 +108,20 @@ void checkSerialCalibrationTrigger() {
     }
 }
 
+#if MASSARBEIT_BUTTON_COUNT >= 1
+
 void onSleepLongPress() {
     Serial.println("[Button] Langer Druck: Deep Sleep angefordert.");
     sleepRequested = true;
 }
 
 // Versetzt die Waage in Deep Sleep (~wenige µA statt 60-150+ mA aktiv).
-// Aufwachen NUR ueber Pins::WAKEUP_BUTTON (Board-Profil): auf der Vision
-// Taste 2 (GPIO14), auf der Basis der einzige Taster (GPIO5). Beide
-// sind bewusst KEIN Strapping-Pin - waere so einer beim Aufwach-Boot noch
-// gedrueckt, koennte der Chip statt der Firmware in den Flash-Download-Modus
-// starten (deshalb scheiden GPIO0 am S3 und GPIO2/8/9 am C3 aus).
+// Gibt es nur auf Varianten mit Taster - ohne Aufweck-Taster gaebe es keinen
+// Weg zurueck, deshalb steht der ganze Block hinter MASSARBEIT_BUTTON_COUNT.
+// Aufwachen ueber Pins::WAKEUP_BUTTON (Board-Profil): auf der Vision Taste 2
+// (GPIO14). Bewusst KEIN Strapping-Pin - waere so einer beim Aufwach-Boot
+// noch gedrueckt, koennte der Chip statt der Firmware in den
+// Flash-Download-Modus starten (deshalb scheidet GPIO0 am S3 aus).
 //
 // Der Weckmechanismus selbst unterscheidet sich: ext0 gibt es nur auf
 // ESP32/ESP32-S3, der C3 der Basis kann stattdessen ueber
@@ -130,13 +131,8 @@ void onSleepLongPress() {
 // es gibt keinen speziellen "Resume"-Pfad, das ist bei ESP32-Deep-Sleep
 // so vorgesehen.
 void enterDeepSleep() {
-#if MASSARBEIT_BUTTON_COUNT >= 2
     Serial.println("[Power] Gehe in Deep Sleep. Taste 2 zum Aufwecken.");
     ui.showMessage("Gute Nacht", "Taste 2 zum\nAufwecken");
-#else
-    Serial.println("[Power] Gehe in Deep Sleep. Taster zum Aufwecken.");
-    ui.showMessage("Gute Nacht", "Taster zum\nAufwecken");
-#endif
     delay(1200);
 
     ui.prepareForSleep();
@@ -179,6 +175,8 @@ void enterDeepSleep() {
     // Wird nie erreicht.
 }
 
+#endif // MASSARBEIT_BUTTON_COUNT >= 1
+
 // Wird von DeviceUi::runBootSequence() zwischen jedem angezeigten Frame
 // aufgerufen - erledigt EINEN Initialisierungsschritt pro Aufruf und gibt
 // true zurueck, solange noch etwas zu tun ist. So laeuft die Bootanimation
@@ -191,16 +189,12 @@ bool runNextBootStep() {
             battery.begin();
             return true;
         case 1:
+#if MASSARBEIT_BUTTON_COUNT >= 1
             buttons.begin();
             buttons.onButton1Click(onButton1Click);
             buttons.onSleepLongPress(onSleepLongPress);
-#if MASSARBEIT_BUTTON_COUNT >= 2
             buttons.onButton2Click(onButton2Click);
             buttons.onCalibrationLongPress(onCalibrationRequested);
-#else
-            // Ein Taster: der lange Druck ist schon mit Deep Sleep belegt,
-            // die Kalibrierung haengt deshalb am Doppelklick (Buttons.h).
-            buttons.onCalibrationDoubleClick(onCalibrationRequested);
 #endif
             return true;
         case 2:
@@ -298,9 +292,10 @@ void setup() {
     Serial.println("Taste 1: Spielauswahl weiter (kurz) / Deep Sleep (2s halten)");
     Serial.println("Taste 2: Spielauswahl bestaetigen (kurz) / Kalibrierung (lang halten)");
 #else
-    Serial.println("Taster: Tara (kurz) / Deep Sleep (2s halten) / Kalibrierung (Doppelklick)");
+    Serial.println("Keine Taster - Bedienung komplett ueber die App (Tara 0x01, Kalibrierung 0x20/0x21).");
+    Serial.println("Ein/Aus: Schiebeschalter des Boards.");
 #endif
-    Serial.println("Serial: 'cal' + Enter startet die Kalibrierung (Werkbank-Ersatz fuer den Taster).");
+    Serial.println("Serial: 'cal' + Enter startet die Kalibrierung.");
 #if AUTO_SLEEP_TIMEOUT_MS > 0
     Serial.printf("[Power] Auto-Sleep nach %lu Minuten Inaktivitaet.\n", AUTO_SLEEP_TIMEOUT_MS / 60000UL);
 #else
@@ -311,14 +306,15 @@ void setup() {
 }
 
 void loop() {
+#if MASSARBEIT_BUTTON_COUNT >= 1
     buttons.update();
-    devOta.update();
-    checkSerialCalibrationTrigger();
-
     if (sleepRequested) {
         sleepRequested = false;
         enterDeepSleep();
     }
+#endif
+    devOta.update();
+    checkSerialCalibrationTrigger();
 
     float weight = scale.getWeight();
     bleService.update();
