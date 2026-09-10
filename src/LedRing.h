@@ -84,10 +84,16 @@ public:
     void clearActivePlayer();
 
     // --- Startampel (Formel 1) --------------------------------------------
-    // Fuenf rote Lampen gehen nacheinander an, bleiben `holdMs` stehen und
-    // erloeschen dann gemeinsam ("lights out") - genau die Ampel, die die
-    // App fuer das Zeitspiel "Formel 1" auf dem Bildschirm zeigt, nur an der
-    // Waage selbst.
+    // Rote Lampen gehen nacheinander an, bleiben `holdMs` stehen und
+    // schalten dann gemeinsam auf Gruen - genau die Ampel, die die App fuer
+    // das Zeitspiel "Formel 1" auf dem Bildschirm zeigt (Formel1Lights.tsx),
+    // im selben Takt und mit derselben Lampenzahl, nur an der Waage selbst.
+    // Vier Lampen auf acht LEDs: jede Lampe ist genau zwei LEDs breit.
+    //
+    // `lampIntervalMs`/`lampCount` kommen aus der App (LIGHT_INTERVAL_MS/
+    // LIGHT_COUNT), 0 = Vorgabe aus Config.h. So gibt es fuer den Takt nur
+    // eine Wahrheit - laeuft er auseinander, geht die Waage zu einem anderen
+    // Zeitpunkt auf Gruen als der Bildschirm.
     //
     // Ausgeloest wird das per BLE (0x30/0x31/0x32, siehe Config.h) aus der
     // App. Wer den Gruen-Zeitpunkt bestimmt, bleibt dabei offen und wird vom
@@ -98,7 +104,7 @@ public:
     // Heute schickt die App die ausgeloste Haltezeit mit (erster Fall).
     // Auf dem TFT der Vision fehlt die Ampel noch (siehe ROADMAP.md,
     // "Formel 1 auf der Vision (TFT) nachziehen").
-    void startRaceLights(uint32_t holdMs = 0);
+    void startRaceLights(uint32_t holdMs = 0, uint16_t lampIntervalMs = 0, uint8_t lampCount = 0);
     void raceLightsGreen();
     // Fehlstart/Abbruch: kurzes rotes Warnblinken, danach zurueck in den
     // normalen Zustand.
@@ -118,9 +124,8 @@ private:
     // normalen Zustand.
     enum class RacePhase : uint8_t {
         Idle,
-        LampsOn,   // Lampen gehen nacheinander an
-        Hold,      // alle fuenf rot, Wartezeit bis Gruen
-        Go,        // "lights out" + gruener Umlauf
+        Red,       // Lampen gehen nacheinander an, danach alle rot bis Gruen
+        Go,        // alle Lampen gruen, bis das Glas abgehoben ist
         FalseStart // Abbruch/Fehlstart
     };
 
@@ -130,7 +135,7 @@ private:
     // den vorherigen Inhalt - so kann die Reihenfolge in renderFrame() ohne
     // Nebenwirkungen umsortiert werden.
     void renderRaceLights(uint32_t now);
-    void drawRaceLamp(uint8_t lamp);
+    void drawRaceLamp(uint8_t lamp, Rgb color, float scale = 1.0f);
     void renderHx711Error(uint32_t now);
     void renderCue(uint32_t now, RemoteCue cue);
     void renderAway(uint32_t now, GameKind game);
@@ -148,9 +153,12 @@ private:
     // auf einem Ring mit 12-24 LEDs ruckartig.
     void setPixelBlended(float position, Rgb color, float scale = 1.0f);
     // Fuellt `fraction` (0..1) des Rings ab Position 0 im Uhrzeigersinn,
-    // die angebrochene LED anteilig gedimmt - Grundlage des Wiege-Balkens
-    // und der Turm-Away-Animation.
+    // die angebrochene LED anteilig gedimmt - Grundlage des Wiege-Balkens.
     void fillArc(float fraction, Rgb color, float scale = 1.0f);
+    // Ein `length` LEDs breiter Block ab der gebrochenen Position `start`,
+    // weich auf die Nachbarn verteilt (setPixelBlended() je LED) - fuer
+    // Dinge, die als Ganzes wandern: Karte, Turmblock, Handschuh.
+    void drawBlock(float start, uint16_t length, Rgb color, float scale = 1.0f);
 
     void show();
 
@@ -186,4 +194,6 @@ private:
     RacePhase racePhase_ = RacePhase::Idle;
     uint32_t racePhaseStartMs_ = 0;
     uint32_t raceHoldMs_ = 0;
+    uint16_t raceLampIntervalMs_ = LED_RING_RACE_LAMP_INTERVAL_MS;
+    uint8_t raceLampCount_ = LED_RING_RACE_LAMP_COUNT;
 };

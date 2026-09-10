@@ -52,6 +52,18 @@ uint8_t addChannel(uint8_t base, uint8_t added) {
     return static_cast<uint8_t>(sum > 255 ? 255 : sum);
 }
 
+// Dieselben Verlaufskurven, die die App-Animationen benutzen (framer-motion
+// "easeIn"/"easeOut"/"easeInOut") - sonst stimmt zwar der Takt, aber die
+// Bewegung beschleunigt an anderen Stellen als auf dem Bildschirm daneben.
+float easeIn(float t) { return t * t; }
+float easeOut(float t) { return 1.0f - (1.0f - t) * (1.0f - t); }
+float easeInOut(float t) { return 0.5f - 0.5f * cosf(PI * t); }
+
+// Position 0..1 innerhalb eines Zyklus von `cycleMs`.
+float cyclePhase(uint32_t elapsedMs, uint32_t cycleMs) {
+    return (elapsedMs % cycleMs) / static_cast<float>(cycleMs);
+}
+
 } // namespace
 
 float LedRing::breathe(uint32_t elapsedMs, uint16_t periodMs) {
@@ -97,16 +109,18 @@ LedRing::Rgb LedRing::fromColor565(uint16_t color565) {
 }
 
 // Kennfarbe je Spiel, damit ein Spiel auf Ring, Display UND App an derselben
-// Farbe erkennbar ist (siehe TftDisplay::gameAccentColor(), gleiche
-// Hex-Werte wie `game.accent.solid` im App-Repo).
+// Farbe erkennbar ist - gleiche Hex-Werte wie TftDisplay::gameAccentColor()
+// und `game.accent.solid` im App-Repo. Bei einem App-Redesign alle drei
+// Stellen zusammen nachziehen (hier stand lange noch die alte Palette:
+// Blackjack blau statt gold, Boxen orange statt violett).
 LedRing::Rgb LedRing::gameColor(GameKind game) {
     switch (game) {
-        case GameKind::Golf:      return {0x4c, 0xaf, 0x50};
-        case GameKind::Dart:      return {0xef, 0x53, 0x50};
-        case GameKind::Blackjack: return {0x42, 0xa5, 0xf5};
-        case GameKind::Tower:     return {0xab, 0x47, 0xbc};
-        case GameKind::Scale:     return {0x26, 0xa6, 0x9a};
-        case GameKind::Boxen:     return {0xff, 0x70, 0x43};
+        case GameKind::Golf:      return {0x4a, 0xde, 0x80}; // #4ade80
+        case GameKind::Dart:      return {0xfb, 0x71, 0x85}; // #fb7185
+        case GameKind::Blackjack: return {0xe8, 0xc1, 0x4d}; // #e8c14d
+        case GameKind::Tower:     return {0xc9, 0x9a, 0x5c}; // #c99a5c
+        case GameKind::Scale:     return {0x38, 0xbd, 0xf8}; // #38bdf8
+        case GameKind::Boxen:     return {0xa7, 0x8b, 0xfa}; // #a78bfa
         default:                  return {ACCENT_R, ACCENT_G, ACCENT_B};
     }
 }
@@ -175,6 +189,10 @@ void LedRing::fillArc(float fraction, Rgb color, float scale) {
         if (coverage > 1.0f) coverage = 1.0f;
         buffer_[i] = scaled(color, scale * coverage);
     }
+}
+
+void LedRing::drawBlock(float start, uint16_t length, Rgb color, float scale) {
+    for (uint16_t i = 0; i < length; ++i) setPixelBlended(start + i, color, scale);
 }
 
 void LedRing::show() {
@@ -283,17 +301,19 @@ void LedRing::clearActivePlayer() {
     activeGame_ = GameKind::None;
 }
 
-void LedRing::startRaceLights(uint32_t holdMs) {
+void LedRing::startRaceLights(uint32_t holdMs, uint16_t lampIntervalMs, uint8_t lampCount) {
     if (!ENABLED) return;
-    racePhase_ = RacePhase::LampsOn;
+    racePhase_ = RacePhase::Red;
     racePhaseStartMs_ = millis();
     raceHoldMs_ = holdMs;
+    raceLampIntervalMs_ = lampIntervalMs ? lampIntervalMs : LED_RING_RACE_LAMP_INTERVAL_MS;
+    raceLampCount_ = lampCount ? lampCount : LED_RING_RACE_LAMP_COUNT;
     remoteCue_ = RemoteCue::None; // Ampel hat waehrend ihres Ablaufs Vorrang
 }
 
 void LedRing::raceLightsGreen() {
     if (!ENABLED) return;
-    // Auch aus LampsOn heraus zulaessig: wenn die App frueher Gruen gibt als
+    // Auch mitten im Aufleuchten zulaessig: wenn die App frueher Gruen gibt als
     // die Lampen brauchen, gewinnt die App - sie fuehrt die Uhr, an der die
     // Reaktionszeit gemessen wird.
     racePhase_ = RacePhase::Go;
@@ -331,7 +351,7 @@ void LedRing::update(bool hx711Connected, bool bleConnected) {
  * einzigem Zusatz ganz oben (sie ist zeitkritisch, ein Fehlstart haengt
  * daran):
  *
- *   Startampel (Formel 1)  fuenf rote Lampen -> aus -> gruener Umlauf
+ *   Startampel (Formel 1)  vier rote Lampen je 2 LEDs -> alle gruen
  *   HX711-Fehler           drei rote Blitze rundum
  *   Bereit (0x11)          gruener Puls
  *   Away (0x13)            spielabhaengige Bewegung (siehe renderAway())
@@ -387,83 +407,89 @@ void LedRing::renderFrame(uint32_t now, bool hx711Connected, bool bleConnected) 
     }
 }
 
-// Eine der fuenf Startlampen, gleichmaessig ueber die verfuegbaren LEDs
-// verteilt. Bewusst auf ganze LEDs gerundet statt weich eingeblendet: eine
-// Ampel muss man zaehlen koennen ("noch zwei, dann geht's los"), und auf
-// einer 8er-Leiste verschmiert eine zwischen zwei LEDs liegende Lampe genau
-// diese Information. Passen mehr LEDs als Lampen aufs Band, bekommt jede
-// Lampe zusaetzlich einen schwachen Nachbarn und wirkt dadurch breiter.
-void LedRing::drawRaceLamp(uint8_t lamp) {
-    constexpr uint8_t LAMP_COUNT = 5;
-    if (COUNT == 0) return;
-    if (COUNT <= LAMP_COUNT) {
-        setPixel(static_cast<int16_t>(lamp % COUNT), {DANGER_R, 0, 0});
+// Eine Startlampe = ein zusammenhaengender Block aus COUNT / Lampenzahl
+// LEDs - bei vier Lampen auf der 8er-Leiste genau zwei LEDs je Lampe, auf
+// einem 16er-Ring vier. Bewusst auf ganze LEDs statt weich eingeblendet: eine
+// Ampel muss man zaehlen koennen ("noch eine, dann geht's los"), und eine
+// zwischen zwei LEDs liegende Lampe verschmiert genau diese Information.
+// Deshalb ist die Lampenzahl so gewaehlt, dass sie die LED-Zahl glatt teilt
+// (siehe LED_RING_RACE_LAMP_COUNT); geht die Teilung doch nicht auf, bleiben
+// die uebrigen LEDs dunkel und verteilen sich auf beide Enden.
+void LedRing::drawRaceLamp(uint8_t lamp, Rgb color, float scale) {
+    if (COUNT == 0 || raceLampCount_ == 0 || lamp >= raceLampCount_) return;
+    uint16_t perLamp = COUNT / raceLampCount_;
+    if (perLamp == 0) {
+        // Mehr Lampen als LEDs: eine LED je Lampe, der Rest faellt weg.
+        if (lamp < COUNT) setPixel(lamp, color, scale);
         return;
     }
-    // Erste Lampe ganz aussen, letzte ganz am anderen Ende - auf der Leiste
-    // sieht das aus wie die Lichtbruecke ueber der Startgeraden.
-    float span = IS_STRIP ? static_cast<float>(COUNT - 1)
-                          : static_cast<float>(COUNT) * (static_cast<float>(LAMP_COUNT - 1) / LAMP_COUNT);
-    int16_t idx = static_cast<int16_t>(lroundf(lamp * span / (LAMP_COUNT - 1)));
-    setPixel(idx, {DANGER_R, 0, 0});
-    if (COUNT >= 2 * LAMP_COUNT) setPixel(idx + 1, {DANGER_R, 0, 0}, 0.45f);
+    uint16_t offset = (COUNT - perLamp * raceLampCount_) / 2;
+    // Ab drei LEDs je Lampe bleibt die letzte als dunkle Fuge stehen, damit
+    // die Lampen auch dann noch einzeln zu sehen sind, wenn alle leuchten.
+    // Bei zwei LEDs je Lampe (8er-Leiste) wuerde die Fuge die Lampe halbieren.
+    uint16_t litPerLamp = perLamp >= 3 ? perLamp - 1 : perLamp;
+    for (uint16_t i = 0; i < litPerLamp; ++i) {
+        setPixel(static_cast<int16_t>(offset + lamp * perLamp + i), color, scale);
+    }
 }
 
 // --- Startampel (Formel 1) --------------------------------------------------
-// Fuenf Lampenpaare gleichmaessig ueber den Ring verteilt, wie die fuenf
-// Lichtbruecken ueber der Startgeraden: alle LED_RING_RACE_LAMP_INTERVAL_MS
-// kommt eine dazu. Sind alle fuenf an, bleiben sie stehen - entweder
-// raceHoldMs_ lang (Waage lost aus) oder unbegrenzt, bis raceLightsGreen()
-// kommt (App lost aus, Standardfall heute: `greenAtMs` in formel1State.ts).
-// "Lights out" ist wie im Original das AUSGEHEN, nicht ein Farbwechsel;
-// der kurze gruene Umlauf danach ist nur die Bestaetigung fuer den, der
-// gerade nicht hingesehen hat.
+// Gleicher Ablauf und gleicher Takt wie Formel1Lights.tsx in der App:
+//
+//   - Lampe n (1..Lampenzahl) geht bei n * Takt an - die erste also NICHT
+//     sofort, sondern nach einem Takt (App: floor(elapsed / LIGHT_INTERVAL_MS)).
+//   - Ab Lampenzahl * Takt stehen alle rot, dann laeuft die Haltezeit -
+//     entweder raceHoldMs_ (Waage lost aus, Standardfall heute) oder
+//     unbegrenzt, bis raceLightsGreen() kommt (holdMs = 0).
+//   - Gruen = alle Lampen schlagen gleichzeitig auf Gruen um. Die App hat
+//     sich bewusst gegen das Formel-1-typische Ausgehen entschieden (ein
+//     Farbumschlag ist im Augenwinkel schwerer zu uebersehen, siehe
+//     Formel1Lights.tsx) - die Waage macht es genauso, sonst hiesse dasselbe
+//     Startsignal auf Bildschirm und Waage zweierlei.
+//
+// Noch nicht angegangene Lampen glimmen schwach, so wie die App die leeren
+// Lampen als dunkle Umrisse zeigt: die Ampel ist ab dem Aufstellen als
+// "scharf" zu erkennen, auch bevor die erste Lampe angeht.
 void LedRing::renderRaceLights(uint32_t now) {
+    constexpr float UNLIT_LAMP_SCALE = 0.3f;
+    const Rgb red = {DANGER_R, 0, 0};
+    const Rgb green = {0, SUCCESS_G, 0};
     uint32_t elapsed = now - racePhaseStartMs_;
-    constexpr uint8_t LAMP_COUNT = 5;
 
     switch (racePhase_) {
-        case RacePhase::LampsOn: {
-            uint8_t lit = static_cast<uint8_t>(elapsed / LED_RING_RACE_LAMP_INTERVAL_MS) + 1;
-            if (lit >= LAMP_COUNT) {
-                lit = LAMP_COUNT;
-                if (elapsed >= static_cast<uint32_t>(LAMP_COUNT) * LED_RING_RACE_LAMP_INTERVAL_MS) {
-                    racePhase_ = RacePhase::Hold;
-                    racePhaseStartMs_ = now;
-                }
-            }
-            clear();
-            for (uint8_t lamp = 0; lamp < lit; ++lamp) drawRaceLamp(lamp);
-            break;
-        }
-
-        case RacePhase::Hold: {
-            clear();
-            for (uint8_t lamp = 0; lamp < LAMP_COUNT; ++lamp) drawRaceLamp(lamp);
-            // raceHoldMs_ == 0 heisst "die App gibt Gruen" - dann hier
-            // bewusst kein Timeout, sonst waere die Ampel bei einer
-            // laengeren Haltezeit vorzeitig aus.
-            if (raceHoldMs_ > 0 && elapsed >= raceHoldMs_) {
+        case RacePhase::Red: {
+            uint32_t allRedMs = static_cast<uint32_t>(raceLampCount_) * raceLampIntervalMs_;
+            if (raceHoldMs_ > 0 && elapsed >= allRedMs + raceHoldMs_) {
+                // Auf den geplanten Gruen-Zeitpunkt setzen, nicht auf `now`
+                // (bis zu ein Frame spaeter) - die Mindestdauer von Gruen
+                // zaehlt sonst ab dem falschen Moment.
                 racePhase_ = RacePhase::Go;
-                racePhaseStartMs_ = now;
+                racePhaseStartMs_ += allRedMs + raceHoldMs_;
+                renderRaceLights(now);
+                return;
+            }
+            uint32_t lit = elapsed / raceLampIntervalMs_;
+            if (lit > raceLampCount_) lit = raceLampCount_;
+            clear();
+            for (uint8_t lamp = 0; lamp < raceLampCount_; ++lamp) {
+                drawRaceLamp(lamp, red, lamp < lit ? 1.0f : UNLIT_LAMP_SCALE);
             }
             break;
         }
 
         case RacePhase::Go: {
-            clear();
-            if (elapsed < LED_RING_RACE_GO_DARK_MS) {
-                // Bewusst nichts zeichnen: das schlagartige Dunkelwerden IST
-                // das Startsignal.
-                break;
-            }
-            uint32_t sinceGo = elapsed - LED_RING_RACE_GO_DARK_MS;
-            if (sinceGo >= LED_RING_RACE_GO_SWEEP_MS) {
+            // Gruen bleibt stehen, bis das Glas abgehoben ist - in der App
+            // verschwinden die gruenen Lampen im selben Moment (Wechsel auf
+            // die Stoppuhr). Mindestdauer, damit ein Abheben exakt auf Gruen
+            // das Signal nicht auf einen Frame zusammenschrumpfen laesst.
+            bool lifted = weightG_ < LED_RING_WEIGH_MIN_G;
+            if (elapsed >= LED_RING_RACE_GO_MAX_MS || (lifted && elapsed >= LED_RING_RACE_GO_MIN_MS)) {
                 racePhase_ = RacePhase::Idle;
+                clear();
                 break;
             }
-            float progress = sinceGo / static_cast<float>(LED_RING_RACE_GO_SWEEP_MS);
-            fillArc(progress, {SUCCESS_R, SUCCESS_G, SUCCESS_B});
+            clear();
+            for (uint8_t lamp = 0; lamp < raceLampCount_; ++lamp) drawRaceLamp(lamp, green);
             break;
         }
 
@@ -553,80 +579,139 @@ void LedRing::renderCue(uint32_t now, RemoteCue cue) {
 }
 
 /**
- * Away ("Glas ist weg") je Spiel - dieselbe Bildidee wie die
- * renderAway*()-Animationen auf dem TFT, auf einen Ring uebersetzt. Laeuft
- * als Endlosschleife, bis Ergebnis oder Idle kommt.
+ * Away ("Glas ist weg") je Spiel - dieselbe Bildidee UND derselbe Takt wie
+ * die Away-Momente der App (GolfBallFlight, DartThrow, BlackjackDraw,
+ * TowerPull, BoxenAwayMoment): dort bewegt sich alles von links nach rechts
+ * und faengt danach von vorn an - hier genauso, LED 0 = links. Die App zeigt
+ * ihren Away-Moment im selben Moment, in dem sie das Kommando schickt, beide
+ * laufen also bis auf die BLE-Latenz im Gleichtakt.
+ *
+ * Einheit fuer alles, was als Ganzes wandert (Karte, Turmblock, Sandsack),
+ * ist wie bei der Startampel ein Viertel der LEDs - auf der 8er-Leiste zwei.
+ * Laeuft als Endlosschleife, bis Ergebnis oder Idle kommt.
  */
 void LedRing::renderAway(uint32_t now, GameKind game) {
     uint32_t elapsed = now - remoteCueSetMs_;
     Rgb color = gameColor(game);
+    const Rgb white = {255, 255, 255};
+    const uint16_t unit = (COUNT >= 4) ? COUNT / 4 : 1;
+    const float last = (COUNT > 0) ? static_cast<float>(COUNT - 1) : 0.0f;
     clear();
 
     switch (game) {
         case GameKind::Golf: {
-            // Ball rollt seine Bahn - ein weisser Punkt mit Schweif auf
-            // gruenem Fairway-Untergrund.
-            fillAll(color, 0.12f);
-            float head = travel(elapsed, 1600);
+            // App: der Ball fliegt in 1.4s (easeInOut) von links nach rechts
+            // und zieht eine Spur hinter sich her. Hier derselbe Flug als
+            // weisser Punkt mit Schweif ueber dem gruenen Fairway.
+            fillAll(color, 0.3f);
+            float head = easeInOut(cyclePhase(elapsed, 1400)) * last;
             for (uint8_t t = 0; t < TAIL; ++t) {
-                setPixelBlended(head - t, {255, 255, 255}, 1.0f - t * (0.85f / TAIL));
+                setPixelBlended(head - t, white, 1.0f - t * (0.85f / TAIL));
             }
             break;
         }
 
         case GameKind::Dart: {
-            // Pfeil fliegt aufs Ziel: der Punkt laeuft beschleunigt auf das
-            // Ende zu (Leiste) bzw. auf die 12-Uhr-Position (Ring) und schlaegt
-            // dort als Blitz ein.
-            constexpr uint32_t FLIGHT_MS = 900;
-            uint32_t phase = elapsed % (FLIGHT_MS + 300);
-            float last = (COUNT > 0) ? static_cast<float>(COUNT - 1) : 0.0f;
+            // App: der Pfeil fliegt in 1.1s beschleunigt (easeIn) auf die
+            // Scheibe rechts. Hier derselbe Flug in 850ms plus 250ms
+            // Einschlag-Blitz am Ende - zusammen wieder 1.1s, damit der
+            // Einschlag auf der Waage mit dem Ankommen in der App zusammenfaellt.
+            constexpr uint32_t CYCLE_MS = 1100;
+            constexpr uint32_t FLIGHT_MS = 850;
+            uint32_t phase = elapsed % CYCLE_MS;
             if (phase < FLIGHT_MS) {
-                float t = phase / static_cast<float>(FLIGHT_MS);
-                float eased = t * t; // beschleunigt, wie ein geworfener Pfeil
-                setPixelBlended(eased * last, color);
+                float pos = easeIn(phase / static_cast<float>(FLIGHT_MS)) * last;
+                setPixelBlended(pos, color);
                 // Kurzer Schweif, damit die Bewegung auch bei wenigen LEDs
                 // als Flug und nicht als Springen gelesen wird.
-                setPixelBlended(eased * last - 1.0f, color, 0.35f);
+                setPixelBlended(pos - 1.0f, color, 0.35f);
             } else {
                 fillAll(color, 0.6f);
-                setPixel(static_cast<int16_t>(last), {255, 255, 255});
+                setPixel(static_cast<int16_t>(last), white);
             }
             break;
         }
 
         case GameKind::Blackjack: {
-            // Karte fuer Karte: die Anzeige fuellt sich in Vierteln, danach
-            // wieder von vorn - das Austeilen als Rhythmus statt als Bild.
-            uint8_t cards = static_cast<uint8_t>((elapsed / 600) % 5);
-            fillArc(cards / 4.0f, color);
+            // App: alle 1.3s fliegt eine Karte von links heran (easeOut, sie
+            // kommt bei 55% an) und dreht sich dann einmal um die eigene
+            // Achse. Hier: Karte = eine Einheit, fliegt in denselben 55% auf
+            // ihren Platz (die Plaetze fuellen sich von rechts), dreht sich -
+            // die Helligkeit folgt dem Drehwinkel, die Rueckseite blitzt weiss
+            // - und bleibt liegen. Nach vier Karten ist die Leiste voll, dann
+            // wird neu gegeben.
+            constexpr uint32_t CARD_MS = 1300;
+            constexpr uint8_t CARDS = 4;
+            constexpr float ARRIVE = 0.55f;
+            uint8_t card = static_cast<uint8_t>((elapsed / CARD_MS) % CARDS);
+            float t = cyclePhase(elapsed, CARD_MS);
+            auto slotStart = [&](uint8_t slot) { return static_cast<float>(COUNT) - (slot + 1) * unit; };
+
+            for (uint8_t dealt = 0; dealt < card; ++dealt) drawBlock(slotStart(dealt), unit, color);
+            float target = slotStart(card);
+            if (t < ARRIVE) {
+                drawBlock(easeOut(t / ARRIVE) * target, unit, color, 0.7f);
+            } else {
+                // Wie in der App: 0->180 Grad bis 80%, 180->360 Grad bis 100%.
+                float angle = (t < 0.8f) ? PI * (t - ARRIVE) / (0.8f - ARRIVE) : PI + PI * (t - 0.8f) / 0.2f;
+                float facing = cosf(angle);
+                bool backSide = facing < 0.0f;
+                drawBlock(target, unit, backSide ? white : color, fabsf(facing) * (backSide ? 0.6f : 1.0f));
+            }
             break;
         }
 
         case GameKind::Tower: {
-            // Wackelturm: der Balken waechst, kippt kurz (flackert) und
-            // faellt wieder in sich zusammen.
-            constexpr uint32_t CYCLE_MS = 2600;
-            uint32_t phase = elapsed % CYCLE_MS;
-            if (phase < 1800) {
-                fillArc(phase / 1800.0f, color);
+            // App (TowerPull, 1.6s): ein Block wird aus dem Turm gezogen (bis
+            // 35%), angehoben (bis 65%) und oben wieder aufgelegt (bis 100%),
+            // der Turm wackelt dabei. Hier liegt der Turm quer - links unten,
+            // rechts oben: drei Einheiten Turm, die oberste Einheit ist frei.
+            // Der gezogene Block (zweite Einheit von unten) leuchtet auf,
+            // wandert nach oben und bleibt dort liegen; waehrend er unterwegs
+            // ist, flackert der Rest-Turm.
+            float t = cyclePhase(elapsed, 1600);
+            const uint16_t gapFrom = unit;
+            const uint16_t gapTo = 2 * unit;
+            const float from = static_cast<float>(gapFrom);
+            const float to = static_cast<float>(COUNT - unit);
+
+            float towerScale = 0.3f;
+            if (t >= 0.35f && t < 0.65f) {
+                towerScale *= 0.6f + 0.4f * cosf((t - 0.35f) / 0.3f * 4.0f * PI);
+            }
+            for (uint16_t i = 0; i + unit < COUNT; ++i) {
+                if (i >= gapFrom && i < gapTo) continue; // Platz des gezogenen Blocks
+                setPixel(static_cast<int16_t>(i), color, towerScale);
+            }
+
+            if (t < 0.35f) {
+                drawBlock(from, unit, color, 0.3f + 0.7f * easeInOut(t / 0.35f));
+            } else if (t < 0.65f) {
+                drawBlock(from + (to - from) * easeInOut((t - 0.35f) / 0.3f), unit, color);
             } else {
-                float wobble = 0.5f + 0.5f * sinf((phase - 1800) / 40.0f);
-                fillArc(1.0f - (phase - 1800) / 800.0f, color, 0.3f + 0.7f * wobble);
+                drawBlock(to, unit, color);
             }
             break;
         }
 
         case GameKind::Boxen: {
-            // Schlag: kurzer heller Aufprall auf 12 Uhr, danach ausrollen.
-            constexpr uint32_t CYCLE_MS = 1200;
-            uint32_t phase = elapsed % CYCLE_MS;
-            if (phase < 120) {
-                fillAll({255, 255, 255});
-            } else {
-                float fade = 1.0f - (phase - 120) / static_cast<float>(CYCLE_MS - 120);
-                fillAll(color, fade * 0.8f);
-            }
+            // App (BoxenAwayMoment, 1.3s): der Handschuh schnellt bis 40%
+            // nach rechts gegen den Sandsack und zieht sich bis 100% wieder
+            // zurueck. Hier: Sandsack = oberste Einheit rechts (schwach
+            // weiss), Handschuh = Punkt in Spielfarbe; beim Aufprall blitzt
+            // der Sack auf und klingt ab.
+            constexpr uint32_t CYCLE_MS = 1300;
+            constexpr float HIT = 0.4f;
+            constexpr float FLASH_MS = 300.0f;
+            float t = cyclePhase(elapsed, CYCLE_MS);
+            float bagStart = static_cast<float>(COUNT - unit);
+            float reach = bagStart - 1.0f; // Handschuh stoppt direkt vor dem Sack
+            float glove = (t < HIT) ? easeInOut(t / HIT) * reach
+                                    : (1.0f - easeInOut((t - HIT) / (1.0f - HIT))) * reach;
+            float sinceHitMs = (t - HIT) * CYCLE_MS;
+            float flash = (t >= HIT && sinceHitMs < FLASH_MS) ? 1.0f - sinceHitMs / FLASH_MS : 0.0f;
+            drawBlock(bagStart, unit, white, 0.3f + 0.7f * flash);
+            setPixelBlended(glove, color);
             break;
         }
 
@@ -709,5 +794,9 @@ void LedRing::renderWaitingForApp(uint32_t now) {
  * ganzen Abend danebensteht.
  */
 void LedRing::renderIdle(uint32_t now) {
-    fillAll({ACCENT_R, ACCENT_G, ACCENT_B}, 0.12f + 0.28f * breathe(now - stateStartMs_, 3600));
+    // Untergrenze 0.3, nicht weniger: nach Gamma und Helligkeitsdeckel
+    // (show()) kommt bei LED_RING_MAX_BRIGHTNESS 40 unterhalb von ~0.25 auf
+    // allen Kanaelen eine glatte 0 an - mit der frueheren Untergrenze 0.12
+    // ging die Leiste im Tiefpunkt jedes Atemzugs doch ganz aus.
+    fillAll({ACCENT_R, ACCENT_G, ACCENT_B}, 0.30f + 0.30f * breathe(now - stateStartMs_, 3600));
 }

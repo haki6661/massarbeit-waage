@@ -110,15 +110,20 @@
 //                       Referenzgewicht - siehe CalibrationRoutine.cpp fuer
 //                       dieselbe Formel). Unplausible Werte (<=0, NaN/Inf)
 //                       werden ignoriert, der bisherige Faktor bleibt aktiv.
-//   0x30 <uint16 LE holdMs>
+//   0x30 <uint16 LE holdMs> [<uint16 LE lampIntervalMs> <uint8 lampCount>]
 //                       Startampel (Formel 1, siehe ROADMAP.md Punkt 1):
-//                       fuenf rote Lampen gehen nacheinander an (LedRing::
-//                       startRaceLights()), bleiben `holdMs` Millisekunden
-//                       stehen und gehen dann von selbst gemeinsam aus,
-//                       gefolgt von einem gruenen Umlauf - kein weiteres
-//                       Kommando noetig. holdMs = 0 heisst "die App gibt
-//                       Gruen von sich aus" (siehe 0x31); dann bleiben alle
-//                       fuenf Lampen stehen, bis 0x31/0x32 kommt. Ohne
+//                       `lampCount` rote Lampen gehen im Abstand von
+//                       `lampIntervalMs` nacheinander an (LedRing::
+//                       startRaceLights()) - die erste nach einem Intervall,
+//                       nicht sofort, genau wie in der App -, bleiben dann
+//                       `holdMs` Millisekunden stehen und schalten von selbst
+//                       gemeinsam auf Gruen - kein weiteres Kommando noetig.
+//                       Die beiden hinteren Felder sind optional (fehlen sie
+//                       oder sind 0: LED_RING_RACE_LAMP_INTERVAL_MS/_COUNT).
+//                       holdMs = 0 heisst "die App gibt Gruen von sich aus"
+//                       (siehe 0x31); dann bleiben alle Lampen stehen, bis
+//                       0x31/0x32 kommt. Gruen bleibt stehen, bis das Glas
+//                       abgehoben ist (siehe LED_RING_RACE_GO_MIN_MS). Ohne
 //                       angehaengten LED-Ring (siehe MASSARBEIT_HAS_LED_RING
 //                       im Board-Profil) ein No-Op - auf der Vision also
 //                       aktuell wirkungslos, siehe ROADMAP.md.
@@ -218,14 +223,26 @@
 #define LED_RING_WEIGH_MIN_G 5.0f
 #define LED_RING_WEIGH_FULL_SCALE_G 400.0f
 
-// Startampel "Formel 1" (siehe LedRing::startRaceLights()). Im echten
-// Rennen kommt etwa jede Sekunde eine Lampe dazu; danach entscheidet
-// entweder eine mitgegebene Haltezeit oder die App, wann es losgeht.
-#define LED_RING_RACE_LAMP_INTERVAL_MS 900
-// "Lights out": erst schlagartig dunkel (das IST das Startsignal), dann ein
-// kurzer gruener Umlauf als Bestaetigung fuer den, der nicht hingesehen hat.
-#define LED_RING_RACE_GO_DARK_MS 150
-#define LED_RING_RACE_GO_SWEEP_MS 600
+// Startampel "Formel 1" (siehe LedRing::startRaceLights()). Lampenzahl und
+// -takt muessen exakt zur App passen (LIGHT_COUNT/LIGHT_INTERVAL_MS in
+// Formel1Config.ts, App-Repo) - sonst geht die Waage zu einem anderen
+// Zeitpunkt auf Gruen als der Bildschirm, und wer auf die Waage schaut,
+// startet zu spaet. Die App schickt beide Werte deshalb im 0x30-Kommando mit;
+// die Vorgaben hier greifen nur, wenn ein aelterer App-Stand sie weglaesst.
+//
+// Vier Lampen statt der fuenf am echten Startgalgen: vier teilt die acht
+// LEDs der Leiste (und die 16 eines Rings) glatt, jede Lampe ist genau zwei
+// (bzw. vier) LEDs breit - bei fuenf Lampen laege eine Lampe zwangslaeufig
+// zwischen zwei LEDs oder waere schmaler als die anderen.
+#define LED_RING_RACE_LAMP_COUNT 4
+#define LED_RING_RACE_LAMP_INTERVAL_MS 700
+// Gruen bleibt stehen, bis das Glas abgehoben ist (Gewicht unter
+// LED_RING_WEIGH_MIN_G) - wie in der App, deren gruene Lampen bis zum
+// Abheben stehen. Mindestens MIN, damit ein Abheben genau auf Gruen das
+// Signal nicht auf einen einzigen Frame zusammenschrumpfen laesst;
+// hoechstens MAX, falls niemand abhebt (gleiche Grenze wie "Bereit").
+#define LED_RING_RACE_GO_MIN_MS 600
+#define LED_RING_RACE_GO_MAX_MS 20000
 // Fehlstart/Abbruch: Dauer des roten Warnblinkens.
 #define LED_RING_RACE_ABORT_MS 1200
 
