@@ -44,10 +44,14 @@ bool Scale::begin() {
         Serial.println("[Scale] Pruefen: VCC, GND, DT->GPIO" + String(dataPin) +
                         ", SCK->GPIO" + String(clockPin) + ", Waegezellen-Anschluss.");
         isConnected = false;
+        // Nicht aufgeben: getWeight() sucht ihn alle RECONNECT_INTERVAL_MS
+        // neu - wer das Kabel nachtraeglich einsteckt, muss nicht neu starten.
+        lastReconnectAttemptMs = millis();
         return false;
     }
 
     isConnected = true;
+    lastReadyMs = millis();
     Serial.println("[Scale] HX711 verbunden. Tariere...");
     hx711.tare();
     lastAutoZeroMs = millis();
@@ -104,13 +108,40 @@ void Scale::saveCalibration() {
     Serial.printf("[Scale] Kalibrierfaktor gespeichert: %.6f\n", calibrationFactor);
 }
 
+void Scale::markHx711Lost(const char* reason) {
+    isConnected = false;
+    loadCellMissing = false;
+    saturatedSinceMs = 0;
+    zeroReadings = 0;
+    currentWeight = 0.0f;
+    samplesInitialized = false;
+    lastReconnectAttemptMs = millis();
+    Serial.printf("[Scale] FEHLER: HX711 verloren (%s) - Verkabelung pruefen.\n", reason);
+}
+
+void Scale::tryReconnect(unsigned long now) {
+    if (now - lastReconnectAttemptMs < RECONNECT_INTERVAL_MS) return;
+    lastReconnectAttemptMs = now;
+    // Nur nach is_ready(): read() der Library wartet sonst blockierend auf
+    // DOUT = LOW - ohne HX711 fuer immer (siehe Kommentar in begin()).
+    if (!hx711.is_ready()) return;
+    if (static_cast<long>(hx711.read()) == 0) return;
+
+    Serial.println("[Scale] HX711 wieder da - tariere neu.");
+    isConnected = true;
+    lastReadyMs = now;
+    zeroReadings = 0;
+    tare(10);
+}
+
 float Scale::getWeight() {
+    unsigned long now = millis();
     if (!isConnected) {
+        tryReconnect(now);
         return 0.0f;
     }
 
     static unsigned long lastReadTime = 0;
-    unsigned long now = millis();
 
     // Max. 50Hz - schnell genug, ohne den HX711 (max. ~80Hz intern) zu ueberfordern.
     if (now - lastReadTime < 20) {
@@ -119,11 +150,50 @@ float Scale::getWeight() {
     lastReadTime = now;
 
     if (!hx711.is_ready()) {
+        // Kommt gar nichts mehr, ist der HX711 weg (Stecker, Versorgung) -
+        // bisher blieb in dem Fall einfach das letzte Gewicht stehen.
+        if (now - lastReadyMs > HX711_LOST_TIMEOUT_MS) markHx711Lost("keine Messwerte mehr");
+        return currentWeight;
+    }
+    lastReadyMs = now;
+
+    // Rohwert selbst lesen statt get_units(1): nur so laesst sich vor dem
+    // Umrechnen pruefen, ob er ueberhaupt plausibel ist. Die Umrechnung
+    // unten ist exakt die der Library (get_units = (roh - Offset) / Faktor).
+    long raw = static_cast<long>(hx711.read());
+
+    if (raw == 0) {
+        if (++zeroReadings >= ZERO_READINGS_LOST) markHx711Lost("nur noch Nullen");
+        return currentWeight;
+    }
+    zeroReadings = 0;
+
+    if (raw >= SATURATION_RAW || raw <= -SATURATION_RAW) {
+        if (saturatedSinceMs == 0) saturatedSinceMs = now;
+        if (!loadCellMissing && now - saturatedSinceMs >= LOAD_CELL_MISSING_AFTER_MS) {
+            loadCellMissing = true;
+            currentWeight = 0.0f;
+            samplesInitialized = false;
+            Serial.println("[Scale] FEHLER: Waegezelle liefert nur Anschlagwerte - nicht angeschlossen?");
+        }
+        // Ein Anschlagwert ist nie ein echtes Gewicht - gar nicht erst in den
+        // Filter, sonst gehen fuer die Dauer bis zur Erkennung absurde
+        // Kilogramm-Werte an die App.
+        return currentWeight;
+    }
+    saturatedSinceMs = 0;
+
+    if (loadCellMissing) {
+        loadCellMissing = false;
+        Serial.println("[Scale] Waegezelle wieder da - tariere neu.");
+        // Der bisherige Nullpunkt kann aus der Zeit ohne Zelle stammen (z.B.
+        // Tara beim Booten auf Anschlagwerten) und waere dann weit daneben.
+        tare(10);
         return currentWeight;
     }
 
-    float rawReading = hx711.get_units(1);
-    if (isnan(rawReading)) {
+    float rawReading = (raw - hx711.get_offset()) / hx711.get_scale();
+    if (isnan(rawReading) || isinf(rawReading)) {
         return currentWeight;
     }
     lastRawReading = rawReading;
