@@ -295,7 +295,7 @@ Serial-Log, das auf der Basis den Bildschirm ersetzt.
 | Zustand | Signal |
 |---|---|
 | Boot | schnelles Auf-/Abblenden |
-| HX711 antwortet nicht | 3 schnelle Blitze, dann Pause |
+| HX711 antwortet nicht oder Wägezelle fehlt (auch im Betrieb erkannt, App zeigt oben einen Hinweis) | 3 schnelle Blitze, dann Pause |
 | wartet auf die App | ein kurzer Blitz alle 2s |
 | verbunden, Leerlauf | Doppel-"Herzschlag" alle 3s |
 | Spieler am Zug | schwaches Dauerlicht |
@@ -432,7 +432,7 @@ Status-LED der Basis):
 |---|---|
 | Startampel Formel 1 | vier rote Lampen à zwei LEDs gehen im App-Takt nacheinander an, bleiben stehen und schalten gemeinsam auf Grün - Grün bleibt, bis das Glas abgehoben ist |
 | Fehlstart / Abbruch | rotes Warnblinken |
-| HX711 antwortet nicht | drei rote Blitze rundum |
+| HX711 antwortet nicht oder Wägezelle fehlt | drei rote Blitze rundum |
 | "Bereit, jetzt trinken" (`0x11`) | ruhiger grüner Puls, nie ganz dunkel |
 | Glas weg / Abschlag (`0x13`) | spielabhängig und im selben Takt wie die Away-Animation der App: Golf fliegender Ball (1,4 s), Dart beschleunigender Pfeil mit Einschlag (1,1 s), Blackjack Karte für Karte mit Umdrehen (1,3 s je Karte), Wackelturm gezogener Block wandert nach oben (1,6 s), Boxen Handschuh trifft Sandsack (1,3 s), sonst ruhiger Komet |
 | Volltreffer (`0x12`) | grüner Grund mit schnellem weißem Umlauf |
