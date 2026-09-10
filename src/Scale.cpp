@@ -262,11 +262,21 @@ float Scale::getWeight() {
     bool nearZero = fabsf(currentWeight) < AUTO_ZERO_BAND_G;
     if (currentFilterState == STABLE && nearZero &&
         now - lastAutoZeroMs > AUTO_ZERO_INTERVAL_MS) {
+        float korrigiert = currentWeight;
         hx711.tare(5);
         noteHx711Responded();
         currentWeight = 0.0f;
         initializeSamples(0.0f);
         lastAutoZeroMs = now;
+        // Nur nennenswerte Korrekturen loggen: das Nachziehen um Zehntelgramm
+        // ist der Normalfall und kaeme alle 8s, das waere reines Rauschen im
+        // Log. Ueberhaupt zu loggen ist aber wichtig - bisher verschob diese
+        // Stelle den Nullpunkt voellig lautlos. Beim Debuggen am 10.09. waren
+        // deshalb im Serial-Log nur die FOLGEN sichtbar (die App meldete
+        // Schlucke, die niemand getrunken hatte), nicht die Ursache.
+        if (fabsf(korrigiert) >= AUTO_ZERO_LOG_THRESHOLD_G) {
+            Serial.printf("[Scale] Auto-Zero: Nullpunkt um %.1f g nachgezogen.\n", korrigiert);
+        }
     }
 
     // Schock-Nullpunkt-Korrektur (siehe Scale.h) - greift unabhaengig vom
@@ -277,12 +287,16 @@ float Scale::getWeight() {
     // aktualisiert, reicht direkt als Absicherung gegen das mechanische
     // Nachschwingen.
     if (!nearZero && currentWeight < NEGATIVE_DRIFT_THRESHOLD_G && now - lastActivity > NEGATIVE_DRIFT_SETTLE_MS) {
+        float korrigiert = currentWeight;
         hx711.tare(5);
         noteHx711Responded();
         currentWeight = 0.0f;
         initializeSamples(0.0f);
         lastAutoZeroMs = now;
-        Serial.println("[Scale] Negativer Nullpunkt-Versatz erkannt, sofort korrigiert.");
+        // Betrag mitloggen: er ist das Mass fuer den mechanischen Fehler
+        // (Plattform verspannt/streift). Am 10.09. reichte diese eine Zahl,
+        // um im App-Log erfundene Schlucke von echten zu unterscheiden.
+        Serial.printf("[Scale] Negativer Nullpunkt-Versatz erkannt (%.1f g), sofort korrigiert.\n", korrigiert);
     }
 
     return currentWeight;

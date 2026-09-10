@@ -169,6 +169,11 @@ private:
     // ein (die Pruefung unten greift nur INNERHALB des Bands).
     static constexpr float AUTO_ZERO_BAND_G = 10.0f;
     static constexpr unsigned long AUTO_ZERO_INTERVAL_MS = 8000;
+    // Ab diesem Betrag ist eine Auto-Zero-Korrektur eine Log-Zeile wert
+    // (siehe getWeight()). Darunter liegt das normale Nachziehen der
+    // Temperaturdrift, das alle 8s anfiele und das Log unbrauchbar machen
+    // wuerde; darueber ist es ein Hinweis auf ein mechanisches Problem.
+    static constexpr float AUTO_ZERO_LOG_THRESHOLD_G = 1.0f;
     unsigned long lastAutoZeroMs = 0;
 
     // Schock-Nullpunkt-Korrektur: guenstige Single-Point-Waegezellen koennen
