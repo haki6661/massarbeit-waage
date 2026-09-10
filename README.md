@@ -441,7 +441,7 @@ Status-LED der Basis):
 | Gewicht auf der Waage | Balken in Spieler-/Spielfarbe, wächst mit dem Gewicht (Vollausschlag bei `LED_RING_WEIGH_FULL_SCALE_G`, Vorgabe 400g) |
 | Spieler am Zug | langsames Atmen in der Spielerfarbe (`0x14`) |
 | wartet auf die App | einzelner blauer Punkt wandert (auf einer geraden Leiste hin und her, auf einem Ring rundum) |
-| verbunden, Leerlauf | ruhiges Atmen im Akzentton, nie ganz dunkel - das "die Waage ist an"-Signal |
+| verbunden, alles in Ordnung, kein Spiel läuft | Regenbogen-Lauf über die ganze Leiste (ein Farbumlauf alle 3 s, von links nach rechts) - das "die Waage ist an und bereit"-Signal |
 
 Der Wiege-Balken ist das einzige Muster, das es weder auf dem TFT noch auf
 der Status-LED gibt: beim Einschenken schaut man aufs Glas, nicht aufs

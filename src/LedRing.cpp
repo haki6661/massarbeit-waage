@@ -125,6 +125,21 @@ LedRing::Rgb LedRing::gameColor(GameKind game) {
     }
 }
 
+LedRing::Rgb LedRing::hueToRgb(float hue) {
+    float h = (hue - floorf(hue)) * 6.0f; // 0..6, ein Sechstel je Farbuebergang
+    int sector = static_cast<int>(h);
+    uint8_t rise = static_cast<uint8_t>((h - sector) * 255.0f);
+    uint8_t fall = static_cast<uint8_t>(255 - rise);
+    switch (sector) {
+        case 0:  return {255, rise, 0};
+        case 1:  return {fall, 255, 0};
+        case 2:  return {0, 255, rise};
+        case 3:  return {0, fall, 255};
+        case 4:  return {rise, 0, 255};
+        default: return {255, 0, fall};
+    }
+}
+
 // ============================================================================
 // Bausteine
 // ============================================================================
@@ -361,7 +376,7 @@ void LedRing::update(bool hx711Connected, bool bleConnected) {
  *   Gewicht auf der Waage  Balken in Spieler-/Spielfarbe, waechst mit dem Gewicht
  *   Spieler am Zug         langsames Atmen in der Spielerfarbe
  *   keine App-Verbindung   einzelner blauer Punkt kreist
- *   verbunden, Leerlauf    sehr schwaches Atmen im Akzentton
+ *   verbunden, Leerlauf    Regenbogen-Lauf (kein Spieler am Zug, nichts drauf)
  */
 void LedRing::renderFrame(uint32_t now, bool hx711Connected, bool bleConnected) {
     const char* stateName = nullptr;
@@ -782,21 +797,27 @@ void LedRing::renderWaitingForApp(uint32_t now) {
 }
 
 /**
- * Leerlauf = "die Waage ist an". Seit die Basis keinen Auto-Sleep mehr hat
- * (sie wird am Schalter ausgeschaltet - kein Taster, kein Deep Sleep), ist
- * das der wichtigste Zustand ueberhaupt: ohne ihn kann niemand sehen, ob das
- * Geraet laeuft oder ob jemand vergessen hat, es einzuschalten - und ein
- * vergessenes, aber eingeschaltetes Geraet kostet den Akku.
+ * Leerlauf = "die Waage ist an und bereit": App verbunden, HX711 und
+ * Waegezelle in Ordnung, niemand am Zug, kein Cue, nichts auf der Waage -
+ * in der Praxis die Lobby bzw. der Spielekatalog, bevor ein Spiel laeuft.
+ * Seit die Basis keinen Auto-Sleep mehr hat (sie wird am Schalter
+ * ausgeschaltet), ist das der am haeufigsten zu sehende Zustand: ohne ihn
+ * kann niemand sehen, ob das Geraet laeuft.
  *
- * Deshalb ein ruhiges, aber deutlich sichtbares Atmen statt des vorherigen
- * Glimmens: es geht nie ganz aus (sonst wirkt es in der dunklen Phase wie
- * "aus"), und es atmet langsam genug, um nicht zu nerven, wenn die Waage den
- * ganzen Abend danebensteht.
+ * Deshalb ein Regenbogen-Lauf: das Farbrad liegt einmal ueber die ganze
+ * Leiste verteilt und wandert langsam von links nach rechts (dieselbe
+ * Richtung wie alle Away-Animationen) - unverwechselbar mit jedem
+ * Spielzustand, die alle in einer einzelnen Farbe leuchten, und nie dunkel.
+ * Die Helligkeit begrenzt wie immer show() (LED_RING_MAX_BRIGHTNESS).
  */
 void LedRing::renderIdle(uint32_t now) {
-    // Untergrenze 0.3, nicht weniger: nach Gamma und Helligkeitsdeckel
-    // (show()) kommt bei LED_RING_MAX_BRIGHTNESS 40 unterhalb von ~0.25 auf
-    // allen Kanaelen eine glatte 0 an - mit der frueheren Untergrenze 0.12
-    // ging die Leiste im Tiefpunkt jedes Atemzugs doch ganz aus.
-    fillAll({ACCENT_R, ACCENT_G, ACCENT_B}, 0.30f + 0.30f * breathe(now - stateStartMs_, 3600));
+    constexpr uint32_t RAINBOW_CYCLE_MS = 3000; // ein voller Farbumlauf
+    if (COUNT == 0) return;
+    float shift = cyclePhase(now - stateStartMs_, RAINBOW_CYCLE_MS);
+    for (uint16_t i = 0; i < COUNT; ++i) {
+        // Minus: das Farbmuster wandert zu hoeheren Indizes, also nach rechts.
+        float hue = i / static_cast<float>(COUNT) - shift;
+        hue -= floorf(hue); // 0..1
+        buffer_[i] = hueToRgb(hue);
+    }
 }
