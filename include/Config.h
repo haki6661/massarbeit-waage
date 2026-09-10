@@ -12,7 +12,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.11.0"
+#define FIRMWARE_VERSION "1.12.0"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -30,7 +30,11 @@
 #define BLE_DEVICE_NAME MASSARBEIT_BLE_NAME
 
 #define BLE_SERVICE_UUID        "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
-#define BLE_WEIGHT_CHAR_UUID    "6E400004-B5A3-F393-E0A9-E50E24DCCA9E" // read+notify, float32 LE, Gramm
+// Gewicht: read+notify, <float32 LE Gramm><uint8 SensorStatus> - das
+// Statusbyte (seit 1.12.0) meldet 0 = ok, 1 = HX711 antwortet nicht,
+// 2 = Waegezelle fehlt (siehe SensorStatus in Scale.h). Die App zeigt damit
+// oben einen Warnhinweis; aeltere Apps lesen nur die ersten vier Bytes.
+#define BLE_WEIGHT_CHAR_UUID    "6E400004-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_COMMAND_CHAR_UUID   "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define BLE_BATTERY_CHAR_UUID   "6E400005-B5A3-F393-E0A9-E50E24DCCA9E" // read+notify, 1 Byte: 0-100 = Prozent, 0xFF = unbekannt (USB gesteckt, siehe Battery::readPercent())
 #define BLE_VERSION_CHAR_UUID   "6E400006-B5A3-F393-E0A9-E50E24DCCA9E" // read, UTF-8-String (FIRMWARE_VERSION)
