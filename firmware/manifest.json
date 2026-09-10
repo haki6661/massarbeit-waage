@@ -1,22 +1,22 @@
 {
   "version": "1.10.0",
   "file": "firmware/t-display-s3.bin",
-  "size": 1036576,
-  "md5": "41e581c16770250993007c5aa6743556",
+  "size": 1036640,
+  "md5": "2eb8d2171f0fa30123e1edff56f4e555",
   "variants": {
     "t-display-s3": {
       "version": "1.10.0",
       "name": "Massarbeit Vision",
       "file": "firmware/t-display-s3.bin",
-      "size": 1036576,
-      "md5": "41e581c16770250993007c5aa6743556"
+      "size": 1036640,
+      "md5": "2eb8d2171f0fa30123e1edff56f4e555"
     },
     "t-oi-plus": {
       "version": "1.10.0",
       "name": "Massarbeit",
       "file": "firmware/t-oi-plus.bin",
-      "size": 597040,
-      "md5": "45c84302d695bcc451ed8953f35af9fb"
+      "size": 598192,
+      "md5": "3006263ed840bf743fd24a65db8a62b4"
     }
   }
 }
