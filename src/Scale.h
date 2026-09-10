@@ -109,6 +109,21 @@ private:
     void markHx711Lost(const char* reason);
     void tryReconnect(unsigned long now);
 
+    // "Der HX711 hat gerade geantwortet" - gehoert an JEDE Stelle, die den
+    // Chip direkt liest, nicht nur in getWeight(). Sonst haelt die Waage ihre
+    // eigenen, blockierenden Messungen fuer "der Chip ist verstummt":
+    // hx711.tare(20) dauert bei 10 SPS gemessene 1838ms und getRawValue()
+    // (= get_value(10)) knapp eine Sekunde - beide laenger als
+    // HX711_LOST_TIMEOUT_MS, und beide stempelten frueher nicht.
+    //
+    // Im Live-Log vom 10.09. sah das so aus: jede App-Tara loeste unmittelbar
+    // "HX711 verloren" aus, und im Eich-Bildschirm der App (der den Rohwert
+    // dreimal pro Sekunde anfordert) lief die Waage dauerhaft im Takt
+    // "verloren -> wieder da -> verloren" - Fehlerbanner in der App, drei rote
+    // Blitze auf dem Ring, obwohl der HX711 fest verloetet war und
+    // einwandfrei mass.
+    void noteHx711Responded() { lastReadyMs = millis(); }
+
     void saveCalibration();
 
     // Smart-Filter: waehrend "Brewing"-artiger Aktivitaet (schnelle Aenderung)
