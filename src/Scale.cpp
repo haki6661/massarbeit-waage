@@ -51,9 +51,11 @@ bool Scale::begin() {
     }
 
     isConnected = true;
-    lastReadyMs = millis();
     Serial.println("[Scale] HX711 verbunden. Tariere...");
     hx711.tare();
+    // Stempel bewusst NACH der Tara: die dauert bei 10 SPS rund zwei Sekunden
+    // und liegt damit ueber HX711_LOST_TIMEOUT_MS (siehe noteHx711Responded()).
+    noteHx711Responded();
     lastAutoZeroMs = millis();
     Serial.println("[Scale] Bereit.");
     return true;
@@ -84,6 +86,7 @@ void Scale::tare(uint8_t times) {
 
     Serial.println("[Scale] Tariere...");
     hx711.tare(times);
+    noteHx711Responded();
 
     currentFilterState = STABLE;
     lastActivity = 0;
@@ -260,6 +263,7 @@ float Scale::getWeight() {
     if (currentFilterState == STABLE && nearZero &&
         now - lastAutoZeroMs > AUTO_ZERO_INTERVAL_MS) {
         hx711.tare(5);
+        noteHx711Responded();
         currentWeight = 0.0f;
         initializeSamples(0.0f);
         lastAutoZeroMs = now;
@@ -274,6 +278,7 @@ float Scale::getWeight() {
     // Nachschwingen.
     if (!nearZero && currentWeight < NEGATIVE_DRIFT_THRESHOLD_G && now - lastActivity > NEGATIVE_DRIFT_SETTLE_MS) {
         hx711.tare(5);
+        noteHx711Responded();
         currentWeight = 0.0f;
         initializeSamples(0.0f);
         lastAutoZeroMs = now;
@@ -296,7 +301,12 @@ long Scale::getRawValue() {
     // Rauschen), ein Einzelwert kann bei der Kalibrierroutine leicht ein
     // Ausreisser sein und einen deutlich falschen (z.B. viel zu kleinen
     // oder falsch vorzeichenbehafteten) Kalibrierfaktor erzeugen.
-    return hx711.get_value(10);
+    long raw = hx711.get_value(10);
+    // Zehn Messungen sind bei 10 SPS knapp eine Sekunde, und die App fragt
+    // waehrend der Eichung mehrmals pro Sekunde an - ohne diesen Stempel
+    // verhungert getWeight() dauerhaft (siehe noteHx711Responded()).
+    noteHx711Responded();
+    return raw;
 }
 
 void Scale::initializeSamples(float initialValue) {
