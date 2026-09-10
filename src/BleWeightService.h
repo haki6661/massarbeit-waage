@@ -82,7 +82,7 @@ private:
     // der Inhalt kann sich zur Laufzeit nicht aendern.
     String buildDeviceInfoJson() const;
 
-    void sendWeight(float grams);
+    void sendWeight(float grams, SensorStatus status);
     void sendBattery(int8_t percent);
     // Antwort auf COMMAND_CALIBRATION_GET_RAW: schreibt+notified den HX711-
     // Rohwert auf BLE_CALIBRATION_CHAR_UUID.

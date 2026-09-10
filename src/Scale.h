@@ -9,6 +9,22 @@
 #include <HX711.h>
 #include <Preferences.h>
 
+// Zustand der Messkette, laufend in getWeight() ueberwacht und per BLE als
+// Statusbyte hinter jedem Gewichtswert an die App gemeldet (siehe
+// BLE_WEIGHT_CHAR_UUID in Config.h) - die Werte sind damit Protokoll und
+// duerfen sich nicht verschieben.
+enum class SensorStatus : uint8_t {
+    Ok = 0,
+    // HX711 antwortet nicht: nie gefunden, im Betrieb verstummt (DOUT bleibt
+    // HIGH) oder liefert nur noch glatte Nullen (DOUT haengt auf LOW).
+    Hx711Missing = 1,
+    // HX711 antwortet, aber die Waegezelle fehlt: mit offenen Eingaengen
+    // laeuft der ADC an den Anschlag (+/-2^23). Mit angeschlossener Zelle
+    // kommt das nie vor - selbst die volle Last der 3kg-Zelle nutzt nur
+    // knapp die Haelfte des Messbereichs.
+    LoadCellMissing = 2,
+};
+
 class Scale {
 public:
     Scale(uint8_t dataPin, uint8_t clockPin, float calibrationFactor);
@@ -43,6 +59,15 @@ public:
     float getCalibrationFactor() const { return calibrationFactor; }
     bool  isHX711Connected() const { return isConnected; }
 
+    // Gesamtzustand fuer Anzeige und App: HX711 da UND Waegezelle da.
+    // isHX711Connected() allein reicht dafuer nicht - ohne Zelle antwortet
+    // der HX711 weiter brav, liefert aber nur Anschlagwerte.
+    SensorStatus sensorStatus() const {
+        if (!isConnected) return SensorStatus::Hx711Missing;
+        return loadCellMissing ? SensorStatus::LoadCellMissing : SensorStatus::Ok;
+    }
+    bool isSensorOk() const { return sensorStatus() == SensorStatus::Ok; }
+
 private:
     HX711 hx711;
     Preferences preferences;
@@ -52,6 +77,37 @@ private:
     float currentWeight;
     float lastRawReading = 0.0f;
     bool isConnected = false;
+
+    // --- Laufzeit-Ueberwachung der Messkette (siehe SensorStatus) ---------
+    // Bisher wurde der HX711 nur einmal beim Booten geprueft: ein im Betrieb
+    // abgezogener HX711 liess das zuletzt gemessene Gewicht einfach stehen,
+    // eine fehlende Waegezelle fiel gar nicht auf (die Anschlagwerte gingen
+    // als absurde Gewichte an die App). Die Grenzen sind bewusst grosszuegig:
+    // ein Fehlalarm mitten im Spiel waere schlimmer als eine Sekunde Verzug.
+    //
+    // Ab hier gilt ein Rohwert als "am Anschlag" (Grenze +/-8388607).
+    static constexpr long SATURATION_RAW = 8300000L;
+    // So lange ohne neuen Messwert (DOUT bleibt HIGH), bis der HX711 als
+    // verloren gilt - der HX711 misst mit 10 oder 80 Hz, 1.5s sind also
+    // mindestens 15 verpasste Messungen.
+    static constexpr unsigned long HX711_LOST_TIMEOUT_MS = 1500;
+    // So viele Nullen in Folge (DOUT haengt auf LOW) = HX711 weg. Ein
+    // echter Rohwert von exakt 0 kommt vor, zehnmal hintereinander nicht.
+    static const int ZERO_READINGS_LOST = 10;
+    // So lange muessen die Rohwerte ununterbrochen am Anschlag stehen, bis
+    // die Waegezelle als fehlend gilt.
+    static constexpr unsigned long LOAD_CELL_MISSING_AFTER_MS = 1000;
+    // Wie oft ein fehlender HX711 neu gesucht wird (wieder angesteckt).
+    static constexpr unsigned long RECONNECT_INTERVAL_MS = 2000;
+
+    unsigned long lastReadyMs = 0;
+    unsigned long lastReconnectAttemptMs = 0;
+    unsigned long saturatedSinceMs = 0; // 0 = gerade nicht am Anschlag
+    int zeroReadings = 0;
+    bool loadCellMissing = false;
+
+    void markHx711Lost(const char* reason);
+    void tryReconnect(unsigned long now);
 
     void saveCalibration();
 

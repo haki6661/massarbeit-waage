@@ -174,6 +174,9 @@ private:
     static Rgb scaled(Rgb color, float factor);
     static Rgb fromColor565(uint16_t color565);
     static Rgb gameColor(GameKind game);
+    // Farbrad: 0..1 -> voll gesaettigte Farbe (rot -> gelb -> gruen ->
+    // cyan -> blau -> magenta -> rot), fuer den Regenbogen im Leerlauf.
+    static Rgb hueToRgb(float hue);
 
     bool ready_ = false;
     Rgb buffer_[COUNT > 0 ? COUNT : 1] = {};

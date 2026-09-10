@@ -134,7 +134,7 @@ void BleWeightService::update() {
 
     if (connected_ && !otaRunning && (now - lastNotifyMs_ >= BLE_WEIGHT_NOTIFY_INTERVAL_MS)) {
         lastNotifyMs_ = now;
-        sendWeight(scale_.getCurrentWeight());
+        sendWeight(scale_.getCurrentWeight(), scale_.sensorStatus());
     }
 
     if (connected_ && !otaRunning && (now - lastBatteryNotifyMs_ >= BLE_BATTERY_NOTIFY_INTERVAL_MS)) {
@@ -165,16 +165,23 @@ String BleWeightService::buildDeviceInfoJson() const {
     return String(buf);
 }
 
-void BleWeightService::sendWeight(float grams) {
+void BleWeightService::sendWeight(float grams, SensorStatus status) {
     if (!weightChar_) return;
 
+    // <float32 LE Gramm><uint8 SensorStatus>, siehe BLE_WEIGHT_CHAR_UUID.
+    // Das Statusbyte haengt hinten dran, damit aeltere Apps (lesen nur die
+    // ersten vier Bytes) unveraendert weiterlaufen.
     union {
         float value;
         uint8_t bytes[4];
-    } payload;
-    payload.value = grams;
+    } weight;
+    weight.value = grams;
 
-    weightChar_->setValue(payload.bytes, 4);
+    uint8_t payload[5];
+    memcpy(payload, weight.bytes, 4);
+    payload[4] = static_cast<uint8_t>(status);
+
+    weightChar_->setValue(payload, sizeof(payload));
     weightChar_->notify();
 }
 

@@ -343,12 +343,16 @@ void loop() {
         calibration.run();
     }
 
-    ui.update(scale.isHX711Connected(), bleService.isConnected());
+    // isSensorOk() statt isHX711Connected(): auch eine fehlende Waegezelle
+    // (HX711 antwortet, liefert aber nur Anschlagwerte) ist ein Fehler der
+    // Messkette und bekommt dieselbe Fehleranzeige auf TFT/LEDs.
+    const bool sensorOk = scale.isSensorOk();
+    ui.update(sensorOk, bleService.isConnected());
     // Gleiche Zustaende wie die Hauptanzeige, zusaetzlich das Live-Gewicht
     // fuer den Wiege-Balken - den gibt es weder auf dem TFT noch auf der
     // Status-LED (siehe LedRing::renderWeighing()).
     ledRing.setWeight(weight);
-    ledRing.update(scale.isHX711Connected(), bleService.isConnected());
+    ledRing.update(sensorOk, bleService.isConnected());
 
     delay(5);
 }
