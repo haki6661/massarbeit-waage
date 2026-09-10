@@ -52,6 +52,8 @@ private:
     static const uint8_t COMMAND_DISPLAY_AWAY = 0x13;
     static const uint8_t COMMAND_PLAYER_TURN = 0x14;
     static const uint8_t COMMAND_PLAYER_CLEAR = 0x15;
+    // "App ist in der Lobby" - siehe LedRing::setInLobby() fuer das Warum.
+    static const uint8_t COMMAND_LOBBY = 0x16;
     static const uint8_t COMMAND_CALIBRATION_GET_RAW = 0x20;
     static const uint8_t COMMAND_CALIBRATION_SET_FACTOR = 0x21;
     static const uint8_t COMMAND_RACE_LIGHTS_START = 0x30;

@@ -314,7 +314,15 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
         }
 
         case COMMAND_PLAYER_CLEAR:
+            // Zug beendet - das Spiel laeuft weiter. NICHT mit der Lobby
+            // verwechseln, dafuer gibt es 0x16.
             ui_.clearActivePlayer();
+            ui_.setInLobby(false);
+            break;
+
+        case COMMAND_LOBBY:
+            ui_.clearActivePlayer();
+            ui_.setInLobby(true);
             break;
 
         case COMMAND_CALIBRATION_GET_RAW: {

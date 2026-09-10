@@ -12,7 +12,7 @@
 // Firmware im GitHub-Repo verfuegbar ist (siehe BLE_OTA_*-Abschnitt unten
 // und SettingsScreen im App-Repo).
 // ============================================================================
-#define FIRMWARE_VERSION "1.12.2"
+#define FIRMWARE_VERSION "1.13.0"
 
 // ============================================================================
 // BLE-Konfiguration
@@ -105,6 +105,11 @@
 //                       (auf dem Display ohnehin auf ca. 10 Zeichen
 //                       abgeschnitten).
 //   0x15               Zug beendet / kein aktiver Spieler - Badge weg.
+//                       Das SPIEL laeuft dabei weiter (z.B. Boxen zwischen
+//                       zwei Runden) - deshalb bleibt der Ring dunkel und
+//                       geht nicht auf Regenbogen.
+//   0x16               App ist in der Lobby, es laeuft kein Spiel.
+//                       Nur daran haengt der Regenbogen (siehe LedRing).
 //   0x20               Kalibrierung: aktuellen HX711-Rohwert messen (Mittel aus
 //                       10 Messungen, dauert ~1s und blockiert currentWeight-
 //                       Updates so lange) und ueber BLE_CALIBRATION_CHAR_UUID
@@ -135,13 +140,14 @@
 //                       um eine laufende Haltezeit vorzeitig zu beenden).
 //   0x32               Startampel: Fehlstart/Abbruch - kurzes rotes
 //                       Warnblinken, danach zurueck in den normalen Zustand.
-// 0x10-0x15 sowie 0x30-0x32 loesen KEINE eigene Gewichtslogik aus, sie
+// 0x10-0x16 sowie 0x30-0x32 loesen KEINE eigene Gewichtslogik aus, sie
 // steuern nur, was die Geraeteanzeige gerade zeigt (TFT-Vollbild bzw.
 // LED-Muster auf der Basis) - die Waage selbst weiss nichts vom Spielzustand,
 // die App entscheidet und schickt nur das Anzeige-Kommando.
 //
 // GameKind-Werte fuer <gameId> (0x13/0x14, siehe DeviceUiTypes.h):
-//   0 = keins/generisch, 1 = Golf, 2 = Dart, 3 = Blackjack, 4 = Tower, 5 = Scale, 6 = Boxen
+//   0 = keins/generisch, 1 = Golf, 2 = Dart, 3 = Blackjack, 4 = Tower, 5 = Scale,
+//   6 = Boxen, 7 = Formel 1
 
 #define BLE_WEIGHT_NOTIFY_INTERVAL_MS 50 // 20x/s, wie im WeighMyBru2-Original
 #define BLE_BATTERY_NOTIFY_INTERVAL_MS 5000 // Akkustand aendert sich langsam - alle 5s reicht, spart Funkverkehr

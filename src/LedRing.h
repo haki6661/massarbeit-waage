@@ -72,9 +72,9 @@ public:
     // intern hoechstens alle LED_RING_FRAME_INTERVAL_MS ein neues Bild.
     void update(bool hx711Connected, bool bleConnected);
 
-    // Aktuelles Gewicht fuer den Wiege-Balken (siehe renderWeighing()).
-    // Ohne diesen Aufruf zeigt der Ring einfach kein Gewicht an, alles
-    // andere funktioniert unveraendert.
+    // Aktuelles Gewicht. Der Ring zeigt es nicht mehr an (der mitwachsende
+    // Balken ist entfallen, siehe renderFrame()), aber die Startampel erkennt
+    // daran, wann das Glas hochgerissen wurde.
     void setWeight(float grams);
 
     // Von TftDisplay/LedStatusUi weitergereicht (attachLedRing()) - der Ring
@@ -82,6 +82,17 @@ public:
     void setRemoteCue(RemoteCue cue, GameKind game = GameKind::None);
     void setActivePlayer(GameKind game, uint16_t color565);
     void clearActivePlayer();
+
+    // "Die App ist in der Lobby, es laeuft kein Spiel" (BLE 0x16, siehe
+    // Config.h). Nur daran haengt der Regenbogen.
+    //
+    // Ohne diese Unterscheidung ging der Ring mitten im Spiel auf Regenbogen,
+    // sobald kurz niemand am Zug war - Boxen setzt zwischen zwei Runden
+    // bewusst keinen aktiven Spieler, Formel 1 nach dem letzten Lauf auch
+    // nicht. Fuer die Waage sah das genauso aus wie "zurueck in der Lobby"
+    // (beides nur ein 0x15), im Live-Log vom 10.09. sprang der Regenbogen
+    // deshalb waehrend einer laufenden Golf-Partie an.
+    void setInLobby(bool inLobby);
 
     // --- Startampel (Formel 1) --------------------------------------------
     // Rote Lampen gehen nacheinander an, bleiben `holdMs` stehen und
@@ -139,7 +150,6 @@ private:
     void renderHx711Error(uint32_t now);
     void renderCue(uint32_t now, RemoteCue cue);
     void renderAway(uint32_t now, GameKind game);
-    bool renderWeighing(uint32_t now); // false, wenn gerade nichts drauf steht
     void renderActivePlayer(uint32_t now);
     void renderWaitingForApp(uint32_t now);
     void renderIdle(uint32_t now);
@@ -189,6 +199,7 @@ private:
     uint32_t remoteCueSetMs_ = 0;
 
     bool hasActivePlayer_ = false;
+    bool inLobby_ = true; // bis die App etwas anderes sagt: kein Spiel am Laufen
     GameKind activeGame_ = GameKind::None;
     Rgb activePlayerColor_ = {255, 255, 255};
 

@@ -121,6 +121,14 @@ LedRing::Rgb LedRing::gameColor(GameKind game) {
         case GameKind::Tower:     return {0xc9, 0x9a, 0x5c}; // #c99a5c
         case GameKind::Scale:     return {0x38, 0xbd, 0xf8}; // #38bdf8
         case GameKind::Boxen:     return {0xa7, 0x8b, 0xfa}; // #a78bfa
+        // Formel 1 bekommt den Akzentton. Der ist frei geworden, seit der
+        // Wiege-Balken weg ist (er war die einzige Stelle, die ihn benutzte),
+        // und er beisst sich mit keiner Statusfarbe: rot bleibt dem Fehler,
+        // blau der fehlenden Verbindung, weiss dem "bereit". Vorher hatte
+        // Formel 1 gar keinen Eintrag und fiel in den default-Zweig - die
+        // Away-Animation lief deshalb im generischen Kometen statt in einem
+        // eigenen Muster.
+        case GameKind::Formel1:   return {ACCENT_R, ACCENT_G, ACCENT_B}; // #f28a4a
         default:                  return {ACCENT_R, ACCENT_G, ACCENT_B};
     }
 }
@@ -305,6 +313,10 @@ void LedRing::setRemoteCue(RemoteCue cue, GameKind game) {
 
 void LedRing::setActivePlayer(GameKind game, uint16_t color565) {
     if (!ENABLED) return;
+    // Ein Spieler am Zug heisst zwingend: ein Spiel laeuft. Das hier
+    // mitzuziehen macht den Lobby-Zustand unabhaengig davon, in welcher
+    // Reihenfolge die App 0x14/0x15/0x16 schickt.
+    inLobby_ = false;
     hasActivePlayer_ = true;
     activeGame_ = game;
     activePlayerColor_ = fromColor565(color565);
@@ -314,6 +326,11 @@ void LedRing::clearActivePlayer() {
     if (!ENABLED) return;
     hasActivePlayer_ = false;
     activeGame_ = GameKind::None;
+}
+
+void LedRing::setInLobby(bool inLobby) {
+    if (!ENABLED) return;
+    inLobby_ = inLobby;
 }
 
 void LedRing::startRaceLights(uint32_t holdMs, uint16_t lampIntervalMs, uint8_t lampCount) {
@@ -388,30 +405,47 @@ void LedRing::renderFrame(uint32_t now, bool hx711Connected, bool bleConnected) 
         renderHx711Error(now);
         stateName = "HX711-Fehler";
     } else {
-        // Cue-Timeout: dieselbe Logik wie in der Hauptanzeige - "bereit"/
-        // "away" duerfen lange stehen, Ergebnisse loesen sich von selbst auf,
-        // falls die App das Zuruecksetzen vergisst oder die Verbindung
-        // mitten im Ritual abbricht.
-        if (remoteCue_ != RemoteCue::None) {
-            bool isLongLived = (remoteCue_ == RemoteCue::Ready || remoteCue_ == RemoteCue::Away);
-            uint32_t timeoutMs = isLongLived ? CUE_TIMEOUT_LONG_MS : CUE_TIMEOUT_RESULT_MS;
-            if (now - remoteCueSetMs_ > timeoutMs) remoteCue_ = RemoteCue::None;
+        // Der Ring zeigt nur noch Zustaende, keine Ergebnisse: die drei
+        // Guete-Cues (Volltreffer/nah dran/daneben) sind hier bewusst raus.
+        // Auf acht schwach angesteuerten LEDs waren "gruener Puls" und
+        // "gruener Umlauf" aus zwei Metern nicht auseinanderzuhalten, und die
+        // Zahl steht ohnehin gross in der App - der Ring hat sie nur
+        // wiederholt. Das Protokoll kennt sie weiterhin (die Vision zeigt sie
+        // auf dem TFT), die Waage ignoriert sie schlicht.
+        if (remoteCue_ == RemoteCue::ResultPerfect || remoteCue_ == RemoteCue::ResultClose ||
+            remoteCue_ == RemoteCue::ResultMiss) {
+            remoteCue_ = RemoteCue::None;
+        }
+
+        // Cue-Timeout: "bereit"/"away" duerfen lange stehen, loesen sich aber
+        // von selbst auf, falls die App das Zuruecksetzen vergisst oder die
+        // Verbindung mitten im Ritual abbricht.
+        if (remoteCue_ != RemoteCue::None && now - remoteCueSetMs_ > CUE_TIMEOUT_LONG_MS) {
+            remoteCue_ = RemoteCue::None;
         }
 
         if (remoteCue_ != RemoteCue::None) {
             renderCue(now, remoteCue_);
             stateName = "Cue";
-        } else if (renderWeighing(now)) {
-            stateName = "Wiegen";
         } else if (hasActivePlayer_) {
             renderActivePlayer(now);
             stateName = "Spieler am Zug";
         } else if (!bleConnected) {
             renderWaitingForApp(now);
             stateName = "wartet auf App";
-        } else {
+        } else if (inLobby_) {
             renderIdle(now);
-            stateName = "Leerlauf";
+            stateName = "Lobby";
+        } else {
+            // Verbunden, ein Spiel laeuft, aber gerade ist niemand am Zug
+            // (Boxen zwischen zwei Runden, Formel 1 nach dem letzten Lauf).
+            // Bewusst dunkel statt Regenbogen: der Regenbogen ist das Signal
+            // "hier laeuft nichts, kommt spielen" und stand bisher mitten im
+            // Spiel - siehe Live-Log 10.09., wo er waehrend einer laufenden
+            // Golf-Partie ansprang. Dunkel heisst hier "von dir wird gerade
+            // nichts erwartet" und braucht kein eigenes Muster.
+            clear();
+            stateName = "Spielpause";
         }
     }
 
@@ -548,10 +582,17 @@ void LedRing::renderCue(uint32_t now, RemoteCue cue) {
 
     switch (cue) {
         case RemoteCue::Ready:
-            // "Bereit, jetzt trinken": ruhiger gruener Puls, nie ganz aus -
-            // eine dunkle Phase koennte im Partylicht als "Ampel aus" und
-            // damit als Startsignal missverstanden werden.
-            fillAll({SUCCESS_R, SUCCESS_G, SUCCESS_B}, 0.35f + 0.65f * breathe(elapsed, 1100));
+            // "Bereit, jetzt trinken": ruhiger Puls, nie ganz aus - eine
+            // dunkle Phase koennte im Partylicht als "Ampel aus" und damit als
+            // Startsignal missverstanden werden.
+            //
+            // Weiss statt gruen, und zwar wegen der Spielerfarben: die Palette
+            // der App (PLAYER_COLOR_PALETTE) enthaelt ein helles Limette, und
+            // ein limettefarben ATMENDER Spieler neben einem gruen PULSIERENDEN
+            // "bereit" sind auf acht schwach angesteuerten LEDs dasselbe Bild -
+            // ausgerechnet in den zwei Zustaenden, die im Ritual unmittelbar
+            // aufeinander folgen. Weiss kann kein Spieler haben.
+            fillAll({255, 255, 255}, 0.35f + 0.65f * breathe(elapsed, 1100));
             break;
 
         case RemoteCue::Away:
@@ -730,6 +771,41 @@ void LedRing::renderAway(uint32_t now, GameKind game) {
             break;
         }
 
+        case GameKind::Formel1: {
+            // Der Away-Moment IST hier die gestoppte Zeit: das Glas ist oben,
+            // die Uhr laeuft. Also ein Wagen, der die Runde faehrt - und
+            // schneller wird, je laenger es dauert. Das erzeugt genau den
+            // Druck, den das Spiel will, und ist von jedem anderen Muster
+            // sofort zu unterscheiden (nichts sonst beschleunigt).
+            //
+            // Umlaufdauer faellt linear von LAP_START_MS auf LAP_MIN_MS,
+            // erreicht nach RAMP_MS. Integriert wird ueber die Zeit statt
+            // travel() zu benutzen: bei veraenderlicher Geschwindigkeit muss
+            // die zurueckgelegte Strecke aufaddiert werden, sonst springt der
+            // Punkt bei jeder Tempoaenderung zurueck.
+            constexpr float LAP_START_MS = 2200.0f;
+            constexpr float LAP_MIN_MS = 550.0f;
+            constexpr float RAMP_MS = 12000.0f;
+            float t = elapsed / RAMP_MS;
+            if (t > 1.0f) t = 1.0f;
+            // Strecke = Integral von 1/Umlaufdauer. Bei linear fallender
+            // Dauer ist das analytisch unschoen - eine kleine Naeherung ueber
+            // die mittlere Geschwindigkeit reicht fuer eine Lichtanimation
+            // vollkommen und bleibt monoton, also sprungfrei.
+            float lapNow = LAP_START_MS + (LAP_MIN_MS - LAP_START_MS) * t;
+            float lapAvg = (LAP_START_MS + lapNow) * 0.5f;
+            float laps = elapsed / lapAvg;
+            float head = (laps - floorf(laps)) * COUNT;
+
+            // Schweif als Bremsspur, und der Ring bleibt schwach durchgezeichnet:
+            // eine dunkle Strecke waere im Partylicht kaum als Rundkurs lesbar.
+            fillAll(color, 0.12f);
+            for (uint8_t i = 0; i < TAIL; ++i) {
+                setPixelBlended(head - i, {255, 255, 255}, 1.0f - i * (0.8f / TAIL));
+            }
+            break;
+        }
+
         default: {
             // Generisch (auch GameKind::Scale): ruhiger Komet - "es laeuft
             // gerade etwas, wir warten".
@@ -742,37 +818,6 @@ void LedRing::renderAway(uint32_t now, GameKind game) {
     }
 }
 
-// --- Wiegen -----------------------------------------------------------------
-
-/**
- * Der Ring als Fuellstandsanzeige: je mehr auf der Waage steht, desto weiter
- * laeuft der Balken herum (Vollausschlag bei LED_RING_WEIGH_FULL_SCALE_G).
- * Das ist das eine Muster, das es weder auf dem TFT noch auf der Status-LED
- * gibt - beim Einschenken schaut man auf das Glas, nicht auf ein Display,
- * und ein wachsender Lichtbogen im Deckel liegt genau im Blickfeld.
- *
- * Gibt false zurueck, wenn (fast) nichts drauf steht - dann bleibt der Ring
- * fuer die darunterliegenden Zustaende (Spieler/Leerlauf) frei, statt eine
- * dauerhaft leere Anzeige zu belegen.
- */
-bool LedRing::renderWeighing(uint32_t now) {
-    if (weightG_ < LED_RING_WEIGH_MIN_G) return false;
-
-    float fraction = weightG_ / LED_RING_WEIGH_FULL_SCALE_G;
-    Rgb color = hasActivePlayer_ ? activePlayerColor_ : gameColor(activeGame_);
-
-    if (fraction >= 1.0f) {
-        // Ueber Vollausschlag: kompletter Ring, langsam pulsierend - der
-        // Balken kann nicht weiter wachsen, die Bewegung zeigt trotzdem an,
-        // dass die Waage lebt.
-        fillAll(color, 0.55f + 0.45f * breathe(now - stateStartMs_, 1500));
-        return true;
-    }
-
-    clear();
-    fillArc(fraction, color);
-    return true;
-}
 
 // --- Ruhezustaende ----------------------------------------------------------
 
