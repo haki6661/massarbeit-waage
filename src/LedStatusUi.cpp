@@ -253,6 +253,8 @@ void LedStatusUi::clearActivePlayer() {
 // Formel-1-Startampel (siehe ROADMAP.md Punkt 1) - komplett an den
 // angehaengten LED-Ring weitergereicht, kein eigener Zustand der Status-LED
 // dafuer (siehe Kommentar bei den Deklarationen in LedStatusUi.h).
-void LedStatusUi::startRaceLights(uint16_t holdMs) { if (ledRing_) ledRing_->startRaceLights(holdMs); }
+void LedStatusUi::startRaceLights(uint16_t holdMs, uint16_t lampIntervalMs, uint8_t lampCount) {
+    if (ledRing_) ledRing_->startRaceLights(holdMs, lampIntervalMs, lampCount);
+}
 void LedStatusUi::raceLightsGreen() { if (ledRing_) ledRing_->raceLightsGreen(); }
 void LedStatusUi::abortRaceLights() { if (ledRing_) ledRing_->abortRaceLights(); }

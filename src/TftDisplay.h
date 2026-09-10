@@ -101,7 +101,7 @@ public:
     // raceLightsGreen()/abortRaceLights()). Die Vision zeigt dazu (noch)
     // nichts auf dem TFT - ohne angehaengten Ring (attachLedRing()) oder auf
     // Boards ohne bestueckten Ring ein reines No-Op.
-    void startRaceLights(uint16_t holdMs = 0);
+    void startRaceLights(uint16_t holdMs = 0, uint16_t lampIntervalMs = 0, uint8_t lampCount = 0);
     void raceLightsGreen();
     void abortRaceLights();
 

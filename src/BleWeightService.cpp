@@ -351,15 +351,20 @@ void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
         }
 
         case COMMAND_RACE_LIGHTS_START: {
-            // <uint16 LE holdMs> optional dran - fehlt es (aeltere/einfache
-            // Aufrufer), gilt 0 ("App gibt Gruen selbst", siehe Config.h).
-            uint16_t holdMs = 0;
-            if (value.size() >= 3) {
-                holdMs = static_cast<uint16_t>(static_cast<uint8_t>(value[1])) |
-                         (static_cast<uint16_t>(static_cast<uint8_t>(value[2])) << 8);
-            }
-            Serial.printf("[BLE] Startampel: Start mit Haltezeit %ums.\n", holdMs);
-            ui_.startRaceLights(holdMs);
+            // <uint16 LE holdMs> [<uint16 LE lampIntervalMs> <uint8 lampCount>],
+            // alles optional - fehlt die Haltezeit (aeltere/einfache
+            // Aufrufer), gilt 0 ("App gibt Gruen selbst"), fehlen Takt/
+            // Lampenzahl, die Vorgaben aus Config.h.
+            auto u16At = [&value](size_t i) {
+                return static_cast<uint16_t>(static_cast<uint8_t>(value[i])) |
+                       (static_cast<uint16_t>(static_cast<uint8_t>(value[i + 1])) << 8);
+            };
+            uint16_t holdMs = value.size() >= 3 ? u16At(1) : 0;
+            uint16_t lampIntervalMs = value.size() >= 5 ? u16At(3) : 0;
+            uint8_t lampCount = value.size() >= 6 ? static_cast<uint8_t>(value[5]) : 0;
+            Serial.printf("[BLE] Startampel: Start mit Haltezeit %ums (Takt %ums, %u Lampen, 0 = Vorgabe).\n",
+                          holdMs, lampIntervalMs, lampCount);
+            ui_.startRaceLights(holdMs, lampIntervalMs, lampCount);
             break;
         }
 

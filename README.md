@@ -318,9 +318,12 @@ nicht unbemerkt verrotten.
 entscheidet, wie sich bewegte Muster verhalten: auf dem Ring laufen sie
 rundum weiter, auf einer geraden Leiste pendeln sie hin und her. Ein Punkt,
 der am Ende der Leiste verschwindet und vorne wieder auftaucht, sieht dort
-nach Fehler aus, nicht nach Animation. Schweiflängen und die Plätze der fünf
-Startampel-Lampen richten sich außerdem nach `MASSARBEIT_LED_RING_COUNT` -
-auf acht LEDs würde ein fester Fünf-Pixel-Schweif einfach alles ausleuchten.
+nach Fehler aus, nicht nach Animation. Schweiflängen, die Breite der
+Startampel-Lampen und die "Einheit" der Away-Animationen (ein Viertel der
+LEDs) richten sich außerdem nach `MASSARBEIT_LED_RING_COUNT` - auf acht LEDs
+würde ein fester Fünf-Pixel-Schweif einfach alles ausleuchten. Deshalb hat
+die Startampel vier Lampen statt fünf: vier teilt 8 und 16 glatt, jede Lampe
+ist genau zwei (Leiste) bzw. vier LEDs (Ring) breit.
 
 Der Ring **ersetzt keine der bestehenden Anzeigen**, er läuft parallel mit:
 auf der Vision zusätzlich zum TFT, auf der Basis zusätzlich zur einfarbigen
@@ -427,11 +430,11 @@ Status-LED der Basis):
 
 | Zustand | Lichtbild |
 |---|---|
-| Startampel Formel 1 | fünf rote Lampen gehen nacheinander an, bleiben stehen, gehen gemeinsam aus ("lights out") - danach kurzer grüner Umlauf |
+| Startampel Formel 1 | vier rote Lampen à zwei LEDs gehen im App-Takt nacheinander an, bleiben stehen und schalten gemeinsam auf Grün - Grün bleibt, bis das Glas abgehoben ist |
 | Fehlstart / Abbruch | rotes Warnblinken |
 | HX711 antwortet nicht | drei rote Blitze rundum |
 | "Bereit, jetzt trinken" (`0x11`) | ruhiger grüner Puls, nie ganz dunkel |
-| Glas weg / Abschlag (`0x13`) | spielabhängig: Golf rollender Ball, Dart beschleunigender Pfeil, Blackjack Karte für Karte, Wackelturm wachsender und kippender Stapel, Boxen Aufprall-Blitz, sonst ruhiger Komet |
+| Glas weg / Abschlag (`0x13`) | spielabhängig und im selben Takt wie die Away-Animation der App: Golf fliegender Ball (1,4 s), Dart beschleunigender Pfeil mit Einschlag (1,1 s), Blackjack Karte für Karte mit Umdrehen (1,3 s je Karte), Wackelturm gezogener Block wandert nach oben (1,6 s), Boxen Handschuh trifft Sandsack (1,3 s), sonst ruhiger Komet |
 | Volltreffer (`0x12`) | grüner Grund mit schnellem weißem Umlauf |
 | nah dran (`0x12`) | zwei lange gelbe Blitze |
 | daneben (`0x12`) | ein langsam abfallendes Rot |
@@ -446,8 +449,9 @@ Display - ein wachsender Lichtbogen im Deckel liegt genau im Blickfeld.
 
 Die Startampel läuft: die App löst sie per BLE aus (`0x30`/`0x31`/`0x32`,
 siehe Abschnitt "BLE") und schickt beim Aufstellen des Glases die ausgeloste
-Haltezeit mit - die Waage zählt die fünf Lampen dann selbst herunter und geht
-ohne weiteres Kommando auf Grün. Der umgekehrte Weg ist ebenfalls vorgesehen:
+Haltezeit samt Lampentakt und -zahl mit - die Waage zählt die Lampen dann
+selbst im selben Takt wie der Bildschirm herunter und geht ohne weiteres
+Kommando auf Grün, im selben Moment wie die App. Der umgekehrte Weg ist ebenfalls vorgesehen:
 `0x30` mit `holdMs = 0` lässt die Lampen stehen, bis die App `0x31` schickt.
 Auf dem TFT der Vision fehlt die Ampel noch (siehe `ROADMAP.md`, "Formel 1
 auf der Vision (TFT) nachziehen").
