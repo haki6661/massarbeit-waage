@@ -61,7 +61,7 @@ public:
     // angehaengten LED-Ring weitergereicht (siehe LedRing::startRaceLights()/
     // raceLightsGreen()/abortRaceLights()). Die einfarbige Status-LED zeigt
     // dazu nichts Eigenes - ohne angehaengten Ring ein reines No-Op.
-    void startRaceLights(uint16_t holdMs = 0);
+    void startRaceLights(uint16_t holdMs = 0, uint16_t lampIntervalMs = 0, uint8_t lampCount = 0);
     void raceLightsGreen();
     void abortRaceLights();
 

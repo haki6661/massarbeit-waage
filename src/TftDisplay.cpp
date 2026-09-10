@@ -587,7 +587,9 @@ void TftDisplay::clearActivePlayer() {
 // Formel-1-Startampel (siehe ROADMAP.md Punkt 1) - komplett an den
 // angehaengten LED-Ring weitergereicht, kein eigener TFT-Zustand dafuer
 // (siehe Kommentar bei den Deklarationen in TftDisplay.h).
-void TftDisplay::startRaceLights(uint16_t holdMs) { if (ledRing_) ledRing_->startRaceLights(holdMs); }
+void TftDisplay::startRaceLights(uint16_t holdMs, uint16_t lampIntervalMs, uint8_t lampCount) {
+    if (ledRing_) ledRing_->startRaceLights(holdMs, lampIntervalMs, lampCount);
+}
 void TftDisplay::raceLightsGreen() { if (ledRing_) ledRing_->raceLightsGreen(); }
 void TftDisplay::abortRaceLights() { if (ledRing_) ledRing_->abortRaceLights(); }
 

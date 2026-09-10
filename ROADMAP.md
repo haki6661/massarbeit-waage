@@ -25,7 +25,7 @@ deshalb über den Titel eines Punktes hierher, nicht über seine Nummer.
 ## 1. Formel 1 auf der Vision (TFT) nachziehen
 
 **Idee:** Die App hat mit "Formel 1" ein Zeitspiel bekommen: Glas aufstellen,
-fünf rote Startlampen, nach einer ausgelosten Haltezeit Grün, dann abheben,
+vier rote Startlampen, nach einer ausgelosten Haltezeit Grün, dann abheben,
 die Mindestmenge der gewählten Strecke (100/200/300 g) wegtrinken und das
 Glas abstellen — gemessen wird die Zeit von Grün bis zum Abstellen, dazu
 Reaktionszeit und Durchfluss in ml/s.
@@ -33,8 +33,8 @@ Reaktionszeit und Durchfluss in ml/s.
 Auf der Basis zeigt die LED-Leiste die Startampel inzwischen live mit (BLE-
 Kommandos `0x30`-`0x32`, siehe `Config.h` und `LedRing::startRaceLights()`/
 `raceLightsGreen()`/`abortRaceLights()`): die App schickt beim Aufstellen des
-Glases die ausgeloste Haltezeit mit (`Formel1Game`/`GameScreen.tsx`,
-App-Repo), die Waage zählt die fünf Lampen selbst herunter und geht nach
+Glases die ausgeloste Haltezeit samt Lampentakt/-zahl mit (`GameScreen.tsx`,
+App-Repo), die Waage zählt die vier Lampen selbst herunter und geht nach
 Ablauf von selbst auf Grün — bei Fehlstart schickt die App zusätzlich den
 Abbruch-Befehl. Die Vision (TFT) weiß davon weiterhin nichts.
 
@@ -48,8 +48,8 @@ Gerät, das direkt vor einem steht, nicht nur auf den Bildschirm daneben.
   synchron zu `GAME_REGISTRY` (App-Repo) gepflegt, ein neues Spiel muss also
   auch hier eingetragen werden. Siehe Punkt 2, der genau diese doppelte
   Pflege abschaffen würde.
-- Eine Ampel-Darstellung auf dem TFT selbst: fünf rote Lampen, die
-  nacheinander angehen, dann ausgehen. Das bestehende Cue-Vokabular
+- Eine Ampel-Darstellung auf dem TFT selbst: vier rote Lampen, die
+  nacheinander angehen und dann gemeinsam auf Grün schalten (wie in der App). Das bestehende Cue-Vokabular
   (Bereit / Away / Ergebnis-Güte) trifft das nicht — "bereit" heißt bei
   Formel 1 gerade NICHT "du darfst trinken", weshalb `GameScreen.tsx`
   (App-Repo) für Formel 1 inzwischen bewusst `showReadyCue()`/`showAwayCue()`
