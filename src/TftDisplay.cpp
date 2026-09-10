@@ -584,6 +584,13 @@ void TftDisplay::clearActivePlayer() {
     forceRedraw_ = true;
 }
 
+// Reicht nur durch: die Status-LED bzw. das TFT hat keinen eigenen
+// Lobby-Zustand, allein der Ring unterscheidet Lobby von Spielpause
+// (siehe LedRing::setInLobby()).
+void TftDisplay::setInLobby(bool inLobby) {
+    if (ledRing_) ledRing_->setInLobby(inLobby);
+}
+
 // Formel-1-Startampel (siehe ROADMAP.md Punkt 1) - komplett an den
 // angehaengten LED-Ring weitergereicht, kein eigener TFT-Zustand dafuer
 // (siehe Kommentar bei den Deklarationen in TftDisplay.h).

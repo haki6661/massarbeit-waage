@@ -44,4 +44,5 @@ enum class GameKind : uint8_t {
     Tower = 4,
     Scale = 5,
     Boxen = 6,
+    Formel1 = 7,
 };

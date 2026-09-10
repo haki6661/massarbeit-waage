@@ -14,6 +14,7 @@
 //   begin(), update(hx711Ok, bleOk), showMessage(title, body),
 //   runBootSequence(stepInit), setRemoteCue(cue, game),
 //   setActivePlayer(game, color565, name), clearActivePlayer(),
+//   setInLobby(inLobby),
 //   startRaceLights(holdMs, lampIntervalMs, lampCount), raceLightsGreen(),
 //   abortRaceLights(),
 //   pickerNext(), pickerConfirm(), prepareForSleep(),

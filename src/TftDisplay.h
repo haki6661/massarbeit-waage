@@ -94,6 +94,7 @@ public:
     // gekuerzt (mehr passt auf dem 320x170-Display ohnehin nicht lesbar hin).
     void setActivePlayer(GameKind game, uint16_t color565, const String& name);
     void clearActivePlayer();
+    void setInLobby(bool inLobby);
 
     // Von BleWeightService bei einem 0x30/0x31/0x32-Kommando aufgerufen
     // (Formel-1-Startampel, siehe ROADMAP.md Punkt 1) - komplett an den
