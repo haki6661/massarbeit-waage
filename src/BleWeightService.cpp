@@ -7,6 +7,9 @@ BleWeightService::BleWeightService(Scale& scale, DeviceUi& ui, Battery& battery)
 void BleWeightService::begin() {
     Serial.println("[BLE] Initialisiere NimBLE...");
 
+    // Vor allem anderen: sobald der Server steht, kann onWrite() feuern.
+    commandQueue_ = xQueueCreate(COMMAND_QUEUE_LENGTH, sizeof(PendingCommand));
+
     NimBLEDevice::init(BLE_DEVICE_NAME);
 
     // Groesseres MTU anfragen, bevor irgendetwas verbindet - der Firmware-
@@ -105,7 +108,17 @@ void BleWeightService::begin() {
     Serial.printf("[BLE] Advertising als \"%s\" gestartet.\n", BLE_DEVICE_NAME);
 }
 
-void BleWeightService::update() {
+bool BleWeightService::update() {
+    // Zuerst die App-Kommandos, damit z.B. ein Tara-Kommando schon vor dem
+    // naechsten Gewichts-Notify wirkt. Hier, im loop()-Task, statt direkt in
+    // onWrite() - siehe commandQueue_.
+    bool handledCommand = false;
+    PendingCommand cmd;
+    while (commandQueue_ && xQueueReceive(commandQueue_, &cmd, 0) == pdTRUE) {
+        handleCommand(std::string(reinterpret_cast<const char*>(cmd.data), cmd.len));
+        handledCommand = true;
+    }
+
     uint32_t now = millis();
 
     if (!connected_ && wasConnected_) {
@@ -143,6 +156,7 @@ void BleWeightService::update() {
     }
 
     ota_.update();
+    return handledCommand;
 }
 
 String BleWeightService::buildDeviceInfoJson() const {
@@ -254,6 +268,20 @@ void BleWeightService::applyLinkSpeed(bool fast) {
 
 void BleWeightService::onWrite(NimBLECharacteristic* characteristic) {
     std::string value = characteristic->getValue();
+    if (value.empty() || !commandQueue_) return;
+
+    PendingCommand cmd;
+    cmd.len = static_cast<uint8_t>(value.size() < sizeof(cmd.data) ? value.size() : sizeof(cmd.data));
+    memcpy(cmd.data, value.data(), cmd.len);
+    // Nicht blockieren: der NimBLE-Host-Task darf hier nicht warten. Voll
+    // laeuft die Schlange nur, wenn loop() sekundenlang haengt (Kalibrierung
+    // per Serial) - dann ist ein verworfenes Anzeige-Kommando das kleinere Uebel.
+    if (xQueueSend(commandQueue_, &cmd, 0) != pdTRUE) {
+        Serial.printf("[BLE] Kommando-Warteschlange voll, 0x%02X verworfen.\n", cmd.data[0]);
+    }
+}
+
+void BleWeightService::handleCommand(const std::string& value) {
     if (value.empty()) return;
 
     uint8_t command = static_cast<uint8_t>(value[0]);

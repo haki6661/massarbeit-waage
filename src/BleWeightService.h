@@ -14,6 +14,8 @@
 
 #include <NimBLEDevice.h>
 #include <NimBLEServer.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 #include "Battery.h"
 #include "DeviceUi.h"
@@ -30,7 +32,12 @@ public:
     BleWeightService(Scale& scale, DeviceUi& ui, Battery& battery);
 
     void begin();
-    void update(); // in loop() aufrufen: sendet Gewicht, haelt Advertising am Laufen
+    // In loop() aufrufen: arbeitet die eingegangenen App-Kommandos ab (siehe
+    // onWrite()), sendet Gewicht, haelt Advertising am Laufen. Gibt true
+    // zurueck, wenn dabei mindestens ein Kommando ausgefuehrt wurde - fuer
+    // den Auto-Sleep-Timer in main.cpp: eine App, die gerade ein Spiel
+    // steuert, ist Aktivitaet, auch wenn sich das Gewicht nicht aendert.
+    bool update();
     bool isConnected() const { return connected_; }
 
     // NimBLEServerCallbacks
@@ -41,10 +48,30 @@ public:
     void onConnect(NimBLEServer* server, ble_gap_conn_desc* desc) override;
     void onDisconnect(NimBLEServer* server) override;
 
-    // NimBLECharacteristicCallbacks (Command-Characteristic)
+    // NimBLECharacteristicCallbacks (Command-Characteristic) - stellt das
+    // Kommando nur in die Warteschlange, ausgefuehrt wird es in update().
     void onWrite(NimBLECharacteristic* characteristic) override;
 
 private:
+    // Ein App-Kommando, wie es auf der Command-Characteristic ankam. 32 Byte
+    // reichen fuer das laengste (PLAYER_TURN: 6 Byte Kopf + Name, den die App
+    // auf 20 Byte kuerzt); ein laengerer Name wird hier abgeschnitten, das
+    // Display kuerzt ihn ohnehin auf 10 Zeichen.
+    struct PendingCommand {
+        uint8_t len;
+        uint8_t data[32];
+    };
+    // onWrite() laeuft im NimBLE-Host-Task, nicht in loop(). Frueher wurden
+    // die Kommandos direkt dort ausgefuehrt - Tara und Rohwert-Messung
+    // takteten den HX711 damit parallel zu scale.getWeight() in loop() an
+    // (zwei Tasks am selben Bit-Bang-Takt = verstuemmelte Messwerte), und die
+    // Anzeige-Kommandos schrieben Strings/Zustand, die loop() im selben
+    // Moment zum Zeichnen las. Jetzt landet jedes Kommando hier und wird in
+    // update() - also in loop() - der Reihe nach abgearbeitet.
+    QueueHandle_t commandQueue_ = nullptr;
+    static const UBaseType_t COMMAND_QUEUE_LENGTH = 16;
+    void handleCommand(const std::string& value);
+
     static const uint8_t COMMAND_TARE = 0x01;
     static const uint8_t COMMAND_DISPLAY_IDLE = 0x10;
     static const uint8_t COMMAND_DISPLAY_READY = 0x11;

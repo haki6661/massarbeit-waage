@@ -281,6 +281,12 @@ void setup() {
     // dazu, statt hinterher eine feste Dauer draufzuschlagen.
     ui.runBootSequence(runNextBootStep);
 
+    // Erst jetzt steht fest, ob Dev-OTA wirklich laeuft: scheitert die
+    // WLAN-Verbindung (Bootschritt 4), bleibt es aus - der Auto-Sleep darf
+    // dann nicht fuer den Rest der Laufzeit abgeschaltet bleiben, nur weil
+    // beim Booten Taste 2 gehalten wurde.
+    devOtaActive = devOta.isActive();
+
     if (!bootHx711Ok) {
         ui.showMessage("Fehler", "HX711 antwortet\nnicht. Verkabelung\npruefen.");
         Serial.println("[Setup] WARNUNG: Waage laeuft ohne HX711 weiter (liefert 0g).");
@@ -317,7 +323,13 @@ void loop() {
     checkSerialCalibrationTrigger();
 
     float weight = scale.getWeight();
-    bleService.update();
+    // Ein App-Kommando (Spielstart, Spielerwechsel, Passen, zurueck in die
+    // Lobby ...) heisst: jemand bedient gerade die Waage - ueber das Handy
+    // statt ueber die Tasten. Bisher zaehlten dafuer nur Tastendruck und
+    // Gewichtsaenderung.
+    if (bleService.update()) {
+        lastActivityMs = millis();
+    }
 
     // Inaktivitaets-Timer: jede spuerbare Gewichtsaenderung zaehlt als
     // Aktivitaet (Tastendruck wird schon direkt in den Button-Callbacks
@@ -333,7 +345,7 @@ void loop() {
     }
 #if AUTO_SLEEP_TIMEOUT_MS > 0
     if (!devOtaActive && millis() - lastActivityMs > AUTO_SLEEP_TIMEOUT_MS) {
-        Serial.println("[Power] Auto-Sleep: keine Aktivitaet seit 10 Minuten.");
+        Serial.printf("[Power] Auto-Sleep: keine Aktivitaet seit %lu Minuten.\n", AUTO_SLEEP_TIMEOUT_MS / 60000UL);
         enterDeepSleep();
     }
 #endif
